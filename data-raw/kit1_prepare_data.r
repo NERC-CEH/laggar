@@ -22,6 +22,7 @@ ID_ti<- 1:nweeks
 ####################
 ## Kittiwake data
 ####################
+# ISSUE #1
 kitty<- read.csv("../Data_for_BioSS/SMP_kitti_BS.csv", stringsAsFactors= T)
 
 ## Supplement for Isle of May
