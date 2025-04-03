@@ -1,0 +1,724 @@
+---
+title: Scalar-on-function regression analysis of kittiwake breeding success in Shetland
+author: David L Miller
+execute:
+  cache: true
+format:
+  html:
+    embed-resources: true
+
+---
+
+Here, we seek to explain variation in the breeding success (“productivity”) of black-legged kittiwakes (henceforth, "kittiwakes") at several breeding colonies monitored by UKCEH and partners. Kittiwakes nest on land but go to sea to search for small forage fish (e.g., sandeel), with the availability and quality of these fish expected to correlate with annual breeding success as they constitute a key part of the diet of chicks. Given that data on sandeel abundance are typically limited in their spatial and temporal resolution, sea surface temperature (SST) is frequently used as a proxy for prey availability for kittiwakes and other seabirds due to its hypothesised links with sandeel abundance and nutritional quality. However, the spatial and temporal scale over which SST may predict kittiwake breeding success is unclear. For example, although we expect the foraging ranges around colonies to be a determinant of the spatial scale of effects, foraging distances vary considerably both between years and between colonies meaning that it’s hard a priori to determine the likely relevant spatial scale. Similarly, the most relevant temporal scale is unclear given that prey availability may be driven by SST both through the previous winter and spring as well as during the breeding season itself.
+
+Here we seek to understand the spatial and temporal scales over which SST predicts kittiwake breeding success. To do this we used seabird breeding success data collected via the Seabird Monitoring Programme and SST data obtained from Marine Scotland’s Scottish Shelf Model. The number of nests per colony (and the proportion of nests that are monitored) varies considerably, so we model the number of chicks produced, standardized by the number of monitored nests (“AON”, for “Apparently Occupied Nests”). This is achieved by using `log(AON)` as an offset term in the model (i.e., with coefficient forced at 1), with a log-link on the linear predictor.
+
+Here we analyse data on number of successful fledglings raised by kittiwakes in Shetland, the most northern island of the UK. We will use the scalar-on-function regression model to take into account spatial and spatio-temporal data where we don't know the exact scales of the effects on fledgling numbers.
+
+
+
+# Preamble
+
+We begin by loading necessary packages and data.
+
+```{r pkg, message=FALSE}
+# data processing
+library(tidyverse)
+
+# plotting
+library(rnaturalearth)
+library(ggplot2)
+library(patchwork)
+
+# spatial
+library(sf)
+library(stars)
+library(units)
+library(terra)
+```
+
+Note we need to use a mixture of R packages to process the spatial data. We rely on `terra` for fast processing of raster data.
+
+This data includes the observations only for Shetland (minus Fair Isle) and Orkney/Fair Isle, we will also require the raster data for sea surface temperature and sandeel density/probability when modelling. These are included separately. Note that although Fair Isle is considered part of Shetland, we include it with Orkney here, as a model validation location.
+
+```{r data}
+load("kittiwake_shetland_orkney.RData")
+```
+
+# Exploratory plot
+
+Now looking at what our data looks like, we plot the locations of the sites around Shetland and their corresponding time series. This code is rather complicated to produce a fancy figure, but the important take-homes are in the time series patterns for each site.
+
+```{r fancy_plot}
+# locations of each subplot
+site_plot_locs <- data.frame(Site = unique(shet$Site),
+                             xpos = c(-2.5, -0.3, -0.4, -1.4,
+                                      -1.75, -2.6, -0.4, -0.25, -2.5),
+                             ypos = c(60.4, 60.85, 60.1, 59.6,
+                                      60.8, 60.05, 59.7, 60.5, 59.7))
+
+# make a plot for each site
+siteplots <- lapply(unique(shet$Site), function(site){
+  # subplot size
+  subwidth <- 0.8
+  subheight <- 0.3
+
+  # make the grob
+  grob <- ggplot(subset(shet, Site==site), aes(x=Year, y=Fledg)) +
+    geom_point() +
+    geom_line() +
+    scale_x_continuous(breaks=c(1993, 2000, 2010, 2019), limits=c(1993, 2019)) +
+    scale_y_continuous(breaks=c(0, 100, 200, 300, 400), limits=c(0, 400)) +
+    #labs(x="Year", y="Fledglings") +
+    labs(x="", y="") +
+    ggtitle(site) +
+    theme_minimal() +
+    theme(plot.background=element_rect("white"),
+          plot.margin = margin(5,10,-10,-10),
+          plot.title = element_text(size=9))
+
+  centx <- subset(site_plot_locs, Site==site)$xpos
+  centy <- subset(site_plot_locs, Site==site)$ypos
+
+  annotation_custom(
+      grob = ggplotGrob(grob),
+      xmin = centx - subwidth/2,
+      xmax = centx + subwidth/2,
+      ymin = centy - subheight/2,
+      ymax = centy + subheight/2
+  )
+
+})
+# give them names so we can match them later
+names(siteplots) <- unique(shet$Site)
+
+# want lines that point from the sites to the subplots
+site_plot_lines <- merge(site_plot_locs,
+                         unique(shet[,c("Site", "StartLong", "StartLat")]))
+
+# create the main map of Shetland
+mp <- ggplot(unique(shet[,c("Site", "StartLong", "StartLat")])) +
+  geom_sf(data=ne_countries(country="United Kingdom", returnclass="sf",
+                            scale="large"), colour=NA) +
+  geom_point(aes(x=StartLong, y=StartLat)) +
+  geom_segment(aes(x=StartLong, xend=xpos, y=StartLat, yend=ypos),
+               data=site_plot_lines) +
+  coord_sf(xlim=c(-3.1,0.2), ylim=c(59.4, 61), expand=FALSE) +
+  labs(x="", y="") +
+  theme_minimal()
+
+# create the inset miniplot of the UK
+boxy <- data.frame(x = c(-3.1, 0.2, 0.2, -3.1, -3.1),
+                   y = c(59.4, 59.4, 61, 61, 59.4))
+
+uk_mini <- ggplot() +
+  geom_sf(data=ne_countries(country="United Kingdom", returnclass="sf",
+                            scale="large"), colour=NA) +
+  geom_path(aes(x=x, y=y), data=boxy) +
+  labs(x="", y="") +
+  coord_sf(xlim=c(-9,2), ylim=c(49.9, 61), expand=FALSE) +
+  theme_minimal() +
+  theme(plot.background=element_rect(fill="white", colour="black"),
+        plot.margin = margin(5,10,-10,-10),
+        axis.text.x=element_blank(), #remove x axis labels
+        axis.ticks.x=element_blank(), #remove x axis ticks
+        axis.text.y=element_blank(),  #remove y axis labels
+        axis.ticks.y=element_blank()  #remove y axis ticks
+        )
+
+# convert the mini-map into a custom annotation to add to the plot
+uk_mini <- annotation_custom(grob = ggplotGrob(uk_mini),
+                             xmin = -2.75 - 0.6/2,
+                             xmax = -2.75 + 0.6/2,
+                             ymin = 60.8 - 0.6/2,
+                             ymax = 60.8 + 0.6/2)
+
+# add everything together into one plot
+siteplot <- Reduce("+", list(mp, siteplots, uk_mini))
+```
+
+```{r fancy_plot_plotit, fig.width=10, fig.height=10}
+# show the plot
+siteplot
+```
+
+```{r save-siteplot, echo=FALSE}
+ggsave(siteplot, file="kittiwake-sites.pdf", height=8.5, width=8.5)
+```
+
+
+# Wrangle the covariate data
+
+Most of the work we need to put in here is to process the covariates to allow for modelling. We need to ensure that we have corresponding matrices for the index variables and SST/sandeels, which must the same size to perform modelling.
+
+We begin with the SST data, which is spatio-temporal in nature, before moving on to the slightly simpler sandeel data, which is only spatial.
+
+## Sea surface temperature data processing
+
+We begin by making the existing `data.frame` spatial:
+
+```{r spat-df}
+# convert data.frame to sf object
+shet <- st_as_sf(shet, coords=c("StartLong", "StartLat"))
+st_crs(shet) <- 4326
+# project to UK grid
+shet <- st_transform(shet, 27700)
+# create a terra version of the data
+vec <- vect(shet)
+```
+
+Now we begin processing the SST data, which is all located in one folder. Each SST raster contains 52 weeks of data for that year, over the whole of the UK. We need to create a "cookie cutter" to extract the SSTs within a circle around the site location for each site. The easiest way to do this is to create one circle, convert to a raster and then move this raster around the SST raster, resampling SST to that size (thus avoiding geometry issues where the matrices are the wrong size). Based on literature, a circle of around 90km seems reasonable, kittiwakes start nesting in around April with breeding concluding by August, so we use weeks 12 through 23 of the year inclusive (more on this later).
+
+```{r buff-create-and-chop}
+# create a point in space
+pt <- vect(matrix(c(0, 0),nrow=1))
+# with a given projection, as the data
+crs(pt) <- crs(vec)
+
+# create a buffer around that point, out to 90km
+buff <- buffer(pt, 90000)
+
+# which weeks to extract, and how many are there
+tweeks <- 1:13
+nweeks <- length(tweeks)
+
+# function to clip the circles out of the SST rasters
+clippy <- function(pti, buff, pt_data, tweeks){
+  # create the raster buffer
+  rbuff <- rast(buff, nrow=30, ncol=30, vals=NA)
+  rbuff[buff] <- TRUE
+
+  # pick a site-year combo
+  pt <- pt_data[pti, ]
+  yr <- pt$Year
+
+  # get the new buffer extent
+  n_ext <- ext(rbuff)[1:4] + ext(pt)[1:4]
+  # set the buffer extent
+  set.ext(rbuff, n_ext)
+
+  # load SST raster for this year and project to UK grid
+  raster_data <- rast(paste0("fulldata/", "SST_", yr ,".tif"))
+  crs(raster_data) <- "EPSG:4326"
+  raster_data <- project(raster_data, "EPSG:27700")
+
+  df <- c()
+  # loop over the weeks we want to sample
+  for(i in tweeks){
+    # cookie cutter averaging to the resolution of the buffer
+    rrr <- terra::resample(raster_data[[i]], rbuff, method="average",
+                           threads=TRUE)
+    # retain only the circle's interior
+    rrr <- mask(rrr, rbuff)
+    # convert to data.frame
+    dat <- as.data.frame(rrr, xy=TRUE, na.rm=FALSE)
+    names(dat) <- c("x", "y", "SST")
+    # add to existing data.frame, including the week number
+    df <- rbind(df, cbind(dat, week=i))
+  }
+  df
+}
+
+# for each row in the data (year-site combination) run the above function
+cls <- lapply(1:nrow(vec), clippy, buff=buff, pt_data=vec, tweeks=tweeks)
+```
+
+Having run the above, the object `cls` is a `list`, with each element corresponding to a site-year combination `data.frame` with data for all weeks we asked for. We can check that worked by simply plotting one element of `cls` (Foula in 1993):
+
+```{r cls-check, fig.width=10, fig.height=10}
+ggplot(cls[[1]]) +
+  geom_tile(aes(x=x,y=y,fill=SST)) +
+  geom_sf(data=st_transform(ne_countries(country="United Kingdom",
+                                         returnclass="sf",
+                                         scale="large"),
+                            27700), colour=NA) +
+  geom_sf(data=shet[1,]$geometry, size=0.3) +
+  coord_sf(xlim=st_coordinates(shet)[1,1] + c(-100000, 100000),
+           ylim=st_coordinates(shet)[1,2] + c(-100000, 100000))+
+  facet_wrap(~week) +
+  scale_fill_viridis_c(na.value=NA) +
+  labs(x="", y="") +
+  theme_minimal()
+```
+
+This looks correct. Now we need to centre the coordinates, since we aren't interested in per-site differences in foraging range, only the general range over all sites. We do this by simply subtracting the site position. Again, we can use `lapply` to work over the whole of the `cls` object easily.
+
+```{r centre-coords}
+cls <- lapply(seq_along(cls), function(i){
+  x <- cls[[i]]
+  x$xc <- x$x - st_coordinates(shet)[i,1]
+  x$yc <- x$y - st_coordinates(shet)[i,2]
+  x
+})
+```
+
+Now we have the things we need, but they're in the wrong format: we need a matrix-column for the scalar-on-function regression to work. We can fix this by setting-up the matrices we need with `NAs` in them, then move the columns of the `data.frames` in `cls` into the rows of the matrices. A `for` loop accomplishes this simply.
+
+```{r matrixify}
+shet$xc <- matrix(NA, nrow=nrow(shet), ncol=nrow(cls[[1]]))
+shet$yc <- matrix(NA, nrow=nrow(shet), ncol=nrow(cls[[1]]))
+shet$week <- matrix(NA, nrow=nrow(shet), ncol=nrow(cls[[1]]))
+shet$SST <- matrix(NA, nrow=nrow(shet), ncol=nrow(cls[[1]]))
+
+for(i in 1:nrow(shet)){
+  shet$xc[i, ] <- cls[[i]]$xc
+  shet$yc[i, ] <- cls[[i]]$yc
+  shet$week[i, ] <- cls[[i]]$week
+  shet$SST[i, ] <- cls[[i]]$SST
+}
+```
+
+Some values of SST are not available, perhaps because of cloud in the original remotely sensed data. We simply set these values to zero (more on this below).
+
+```{r sst-missing}
+shet$SST[is.na(shet$SST)] <- 0
+```
+
+Finally for the SST data, we change to radial coordinates, since we're interested primarily in the distance from the nest site, rather than the projected latitude/longitude coordinates. Recalling some trigonometry:
+
+```{r sst-coords-to-radial}
+shet$r <- sqrt(shet$yc^2 + shet$xc^2)
+shet$theta <- atan2(shet$yc, shet$xc)
+```
+
+Note that here, because of R's vectorisation, we can act on the whole matrix in an element-wise way, creating the corresponding distance and angle matrices easily.
+
+## Sandeels
+
+As mentioned above, sandeels are one of the primary prey items for kittiwakes. [Langton, Boulcott and Wright (2021)](https://www.int-res.com/abstracts/meps/v667/p145-159/) provide a map of sandeel probability of presence in the North Sea ([available at this URL](https://www.data.gov.uk/dataset/9af04ca7-82da-46d0-a9ef-e7ce0ecce905/species-distribution-a-verified-distribution-model-for-the-lesser-sandeel-ammodytes-marinus)), which we use here. Unfortunately, the sandeel map is static in time, so cannot be used to model temporal dynamics in our data.
+
+Once again, we rely on `terra` to load and manipulate the raster data. The raster provided is at very fine resolution, which would cause memory issues in modelling. To alleciate this, we downsample the data before manipulation.
+
+```{r sandeel-load}
+sa <- rast("fulldata/nmpwfs_species_distribution_lesser_sandeels_north_sea_probability_presence.tif")
+
+# resample to lower resolution
+res_template <- rast(nrows=3000, ncols=1500,
+                     xmin=ext(sa)[1], xmax=ext(sa)[2],
+                     ymin=ext(sa)[3], ymax=ext(sa)[4])
+sa <- resample(sa, res_template)
+
+# project the data to UK grid
+sa <- project(sa, "EPSG:27700")
+```
+
+We can check that worked:
+
+```{r sandeel-plot-check}
+plot(sa)
+```
+
+Note that there is no requirement that the SST and sandeel data are provided at the same resolution.
+
+Now we perform a very similar operation to that which we performed on the SST data to "cut out" the relevant parts of the sandeel raster. In this case, our life is slightly simpler as we only need to consider space, not space and time.
+
+```{r sandeels-clippy}
+clippy2 <- function(pti, buff, pt_data, raster_data){
+  # create the raster buffer
+  rbuff <- rast(buff, nrow=30, ncol=30, vals=NA)
+  rbuff[buff] <- TRUE
+
+  # pick a site-year combo
+  pt <- pt_data[pti, ]
+
+  # get the new buffer extent
+  n_ext <- ext(rbuff)[1:4] + ext(pt)[1:4]
+  # set the buffer extent
+  set.ext(rbuff, n_ext)
+
+  # cookie cutter averaging to the resolution of the buffer
+  rrr <- terra::resample(raster_data, rbuff, method="average",
+                         threads=TRUE)
+
+  # retain only the circle's interior
+  rrr <- mask(rrr, rbuff)
+  # convert to data.frame
+  dat <- as.data.frame(rrr, xy=TRUE, na.rm=FALSE)
+  names(dat) <- c("x", "y", "sandeels")
+  dat$xc <- dat$x - st_coordinates(pt)[1,1]
+  dat$yc <- dat$y - st_coordinates(pt)[1,2]
+
+  dat
+}
+
+# now running that over all the site-year combinations in our Shetland data
+sacls <- lapply(1:nrow(shet), clippy2, buff=buff, pt_data=shet, raster=sa)
+```
+
+Again, we create matrices to hold our data and transfer from the `list` of `data.frame`s to the rows of those matrices:
+
+```{r sandeels-df-to-mat}
+shet$sand_xc <- matrix(NA, nrow=nrow(shet),  ncol=nrow(sacls[[1]]))
+shet$sand_yc <- matrix(NA, nrow=nrow(shet),  ncol=nrow(sacls[[1]]))
+shet$sandeels <- matrix(NA, nrow=nrow(shet), ncol=nrow(sacls[[1]]))
+
+for(i in 1:nrow(shet)){
+  shet$sand_xc[i, ]  <- sacls[[i]]$xc
+  shet$sand_yc[i, ]  <- sacls[[i]]$yc
+  shet$sandeels[i, ] <- sacls[[i]]$sandeels
+}
+```
+
+As with the SST, we set any `NA` values of sandeels to be zero:
+```{r sandeels-na-to-zero}
+shet$sandeels[is.na(shet$sandeels)] <- 0
+```
+
+Finally, we made the transformation to polar coordinates:
+
+```{r sandeels-polar}
+shet$sand_r <- sqrt(shet$sand_yc^2 + shet$sand_xc^2)
+shet$sand_theta <- atan2(shet$sand_yc, shet$sand_xc)
+```
+
+# Modelling
+
+Having done all of the heavy lifting, getting the data into the correct format, we can now focus on modelling. Note that we don't include "non-transferable" covariates like year or site in these models, since we want to test them later against data from other sites not included in the sample used for fitting. In that case having e.g., a random effect of site, is not useful (and prevents us doing that test).
+
+We begin with a model that includes a scalar-on-function regression term of SST only. In that case we have the following model:
+
+$$
+\mathbf{E}(n_{m,y}) = \exp \left[ \log(A_{m,y}+1) + \sum_{r,\theta,w} \text{SST}_{m,y,r, \theta, w} s(r,\theta, w) \right]
+$$
+
+where $r$ is the radial distance and $\theta$ is the angle of the observation of sea surface temperature at site $m$ in year $y$. $n_{m,y}$ is the number of fledglings at site $m$ in year $y$ and $A_{m,y}$ is the corresponding apparently occupied nests (AON) in that year/site combination. We assume that the distribution of $n_{m,y}$ is Tweedie.
+
+Since radial distance, angle and week are not recorded in the same units, we use a tensor product to construct the corresponding term in our GAM. We also need to be aware that angles are cyclic data, so angles don't end at 0 or $2\pi$ radians, they join-up there. In this case we need to use a cyclic spline to ensure this matching (specifying this in the basis, `bs=` argument). From an `mgcv` perspective, we therefore need to include additional information on this join (in our case angles were measured from $-\pi$ to $\pi$ radians) to the `knots` argument.
+
+```{r SST-model, message=FALSE}
+library(mgcv)
+m_SST <- gam(Fledg ~ offset(log(AON+1)) +
+                     te(theta, r, week, by=SST,
+                        bs=c("cc", "cr", "cr")),
+             knots=list(theta=c(-pi, pi)),
+             data= shet, family= tw(),
+             method= "REML")
+```
+
+Having fitted this model, we can investigate how well it did:
+
+```{r SST-model-res, fig.width=10, fig.height=10}
+summary(m_SST)
+gam.check(m_SST)
+```
+
+We note that the $R^2$ and percentage of deviance explained is relatively low, but we'll see later that this is fairly good in comparison to the standard model and when extrapolating to new sites.
+
+Adding sandeel probability of presence is very similar, but since there is no temporal component, we only need angle and distance:
+
+```{r sandeel-model, fig.width=10, fig.height=10}
+m_SST_sandeel <- gam(Fledg ~ offset(log(AON+1)) +
+                             te(theta, r, week, by=SST,
+                                bs=c("cc", "cr", "cr")) +
+                             te(sand_theta, sand_r, by=sandeels,
+                                bs=c("cc", "cs")),
+                     knots=list(theta=c(-pi, pi),
+                                sand_theta=c(-pi, pi)),
+                     data=shet, family=tw(),
+                     method= "REML")
+
+summary(m_SST_sandeel)
+gam.check(m_SST_sandeel)
+```
+
+Note that we used the `"cs"` basis for the sandeel radial distance term, which includes a shrinkage component to the term penalty, allowing for the term to be removed from the model during fitting, by estimating all coefficients to (numerically) zero. We can see this happening here, where the EDF is much less than one.
+
+The above indicates that the sandeel covariate is not so useful for predicting the fledgling counts, so we will continue with the model which has only SST in it, `m_SST`.
+
+## Model checking
+
+To check our model, we will plot aggregated residuals to see whether there are any major patterns in the residuals.
+
+```{r model-checking, fig.width=10, fig.height=8}
+# make a copy of the data
+resid_chk <- shet
+# add the residuals
+resid_chk$resids <- residuals(m_SST)
+# create ~5 year bins
+yrbins <- c(1993, seq(1995, 2015, by=5), 2019)
+resid_chk$hdecade <- cut(resid_chk$Year, yrbins,
+                         labels=paste(yrbins[-length(yrbins)], "-", yrbins[-1]),
+                         include.lowest=TRUE)
+
+# get totals for each boxplot
+resid_chk_n_d <- resid_chk %>%
+  group_by(hdecade) %>%
+  summarize(n=n())
+resid_chk_n_s <- resid_chk %>%
+  group_by(Site) %>%
+  summarize(n=n())
+
+(ggplot(resid_chk) +
+  geom_boxplot(aes(x=hdecade, y=resids)) +
+  geom_hline(yintercept=0, lty=2) +
+  geom_text(aes(x=hdecade, label=n), y=-6, data=resid_chk_n_d,
+            colour="grey60") +
+  labs(x="Years", y="Residuals") +
+  theme_minimal())/
+(ggplot(resid_chk) +
+  geom_boxplot(aes(x=Site, y=resids)) +
+  geom_hline(yintercept=0, lty=2) +
+  geom_text(aes(x=Site, label=n), y=-6, data=resid_chk_n_s, colour="grey60") +
+  labs(x="Site", y="Residuals") +
+  theme_minimal())
+```
+
+These plots don't look too bad -- we would hope that the boxplots' inter-quartile range crosses the zero line, which we see in almost all cases. Although there is some deviation in the edges (1993-1995 and 2015-2019) we note that there are fewer data in those bins (denoted in grey). Also worth noting that Compass Head has the fewest observations overall (shortest time series) so it's perhaps expected that performance will be poor for this site. This is all worth bearing in mind when looking at the comparison between predictions and data later.
+
+## Visualising effects
+
+Default plotting for the scalar-on-function regression terms is not very flexible. So here we create a new `data.frame` of angles, distances and weeks to predict at, then plot the resulting surfaces in polar coordinates.
+
+We begin by creating the data to predict at. The `expand.grid` function allows us to specify axes of covariates and then completes the combinations of those axes.
+
+```{r effects-plot-data}
+eff_plot <- expand.grid(theta = seq(-pi, pi, length.out=40),
+                   r = seq(0, 90000, length.out=100),
+                   week = tweeks)
+# set to fixed values
+eff_plot$AON <- 1
+# we just want to look at the smooth, so we just need to set SST to 1
+eff_plot$SST <- 1
+# make a week name column for plotting
+eff_plot$wname <- paste("Week", eff_plot$week)
+```
+
+With the data set-up, we can now make a prediction. We use the `type="terms"` argument to provide per-term predictions, on the link function scale. That means that the returned object is a matrix where the columns contain predictions for each term (in this case we only have one).
+
+```{r effects-pred}
+# make the predictions and assign to the data.frame
+eff_plot$pp <- predict(m_SST, eff_plot, type="terms")[,1]
+```
+
+Now we can make the plot. The `coord_radial()` plotting system in `ggplot2` is a little odd, so one needs to remember to include the `expand=` options to ensure that the plot wraps-around correctly.
+
+```{r effects-plot-plot, fig.width=10, fig.height=10}
+ggplot(eff_plot) +
+  geom_tile(aes(y=r, x=theta, fill=pp)) +
+  # 4 guide lines
+  geom_hline(yintercept=30000, lty=2) +
+  geom_hline(yintercept=70000, lty=3) +
+  geom_hline(yintercept=90000, lty=1, lwd=0.2) +
+  facet_wrap(~week) +
+  scale_fill_gradient2(transform="reverse") +
+  coord_radial(direction=-1, start=pi) +
+  scale_x_continuous(expand=expansion(0,0), labels=NULL) +
+  scale_y_continuous(expand=expansion(0,2), labels=NULL) +
+  labs(x="", y="", fill=expression(s(r , theta , w))) +
+  theme_minimal() +
+  theme(legend.position="bottom",
+        legend.key.width=unit(1, "null"))
+```
+
+We only estimated one angle/distance/week relationship with SST in our model, so we have one plot per week showing the angle-distance smooth (we could have faceted in different ways, but this seems like the most logical). The colour scale here shows the effect size of the smooth, which the SST values will be multiplied by before summing.
+
+Plots are oriented such that the top is North. The inner dashed circle indicates a distance of 30km from the centre and the dotted circle is at 70km. The whole plot has a radius of 90km (black solid line) at the limit of the data seen by the model.
+
+```{r pred-term-sums}
+pred_sums <- shet
+fullpred <- predict(m_SST, type="terms", se.fit=TRUE)
+pred_sums$sofr_pred <- fullpred$fit[,1]
+pred_sums$sofr_pred_se <- fullpred$se.fit[,1]
+
+ggplot(pred_sums) +
+  geom_point(aes(x=Year, y=sofr_pred)) +
+  geom_line(aes(x=Year, y=sofr_pred)) +
+  facet_wrap(~Site) +
+  theme_minimal()
+```
+
+# Comparing the fit to data
+
+We can squint at the above for a while, but we should also test the within-sample predictive power of our model. We can look at the fitted values (with uncertainty) from our model and compare these to the per-site time series.
+
+```{r fit-check}
+# make a copy of the data
+ftdat <- shet
+
+
+
+# make predictions, with standard error estimates
+mp <- predict(m_SST, shet, se.fit=TRUE)
+mp <- predict(m_simple, shet, se.fit=TRUE)
+
+# calculate mean and approximate upper/lower 95% intervals
+ftdat$fitted <- exp(mp$fit)
+ftdat$upper <- exp(mp$fit + 1.96*mp$se.fit)
+ftdat$lower <- exp(mp$fit - 1.96*mp$se.fit)
+```
+
+```{r plot-fit-check, fig.width=10, fig.height=9}
+ggplot(ftdat, aes(x=Year)) +
+  geom_point(aes(y=Fledg), pch=23, colour="red") +
+  geom_line(aes(y=Fledg), colour="red") +
+  geom_point(aes(y=fitted)) +
+  geom_errorbar(aes(ymin=lower, ymax=upper)) +
+  facet_wrap(~Site, scale="free_y") +
+  scale_x_continuous(breaks=c(1993, seq(2000, 2020, by=5))) +
+  labs(y="Fledgling count (red)/predictions (black)") +
+  theme_minimal()
+```
+
+The red line joins the observed counts, whereas the black dot-and-whisker plots give the model estimate with 95% confidence intervals.
+
+These are not the most impressive plots, but they do show that the model can roughly capture the trends in the data. Given the lack of causal proximity between SST and fledgling counts, we should not be too unhappy with these results.
+
+# Comparison to "simpler" models
+
+For reference, let's try a model without scalar-on-function regression terms in it to see how we could have done without all the faff above. Let's begin with a simple model that takes average values of SST and sandeel probability of presence over the same geographic extent. For the SST we will take 4 week averages and fit each term (so weeks 12-15, 16-19, 20-23 are grouped to create three covariates, `SSTwkly1`, `SSTwkly2` and `SSTwkly3`).
+
+Let's create those summaries for this simpler model:
+
+```{r simpler-model-data-prep}
+shet$SSTwkly1 <- NA
+shet$SSTwkly2 <- NA
+shet$SSTwkly3 <- NA
+shet$sandeels_avg <- NA
+
+# taking the mean values at the three time points for SST
+for(i in 1:nrow(shet)){
+  shet$SSTwkly1[i] <- mean(shet$SST[i, ][shet$week[i,] %in% 1:4], na.rm=TRUE)
+  shet$SSTwkly2[i] <- mean(shet$SST[i, ][shet$week[i,] %in% 5:9], na.rm=TRUE)
+  shet$SSTwkly3[i] <- mean(shet$SST[i, ][shet$week[i,] %in% 10:13], na.rm=TRUE)
+  shet$sandeels_avg[i] <- mean(shet$sandeels[i, ])
+}
+```
+
+With the data prepared, we can now run the model, including all three measures of SST.
+
+```{r simple-fit, fig.width=10, fig.height=10}
+m_simple <- gam(Fledg ~ offset(log(AON+1)) +
+                        s(SSTwkly1, bs="cs") +
+                        s(SSTwkly2, bs="cs") +
+                        s(SSTwkly3, bs="cs") +
+                        s(sandeels_avg, k=8, bs="cs"),
+                data= shet, family= tw(),
+                method= "REML")
+summary(m_simple)
+gam.check(m_simple)
+```
+
+A very disappointing model here, showing only the first measure of SST (weeks 12 to 15 average) has any real effect, and that this was linear. We also see a worryingly bimodal pattern in the residuals.
+
+This model also has a significantly worse AIC:
+
+```{r compare-simpler}
+AIC(m_simple, m_SST, m_SST_sandeel)
+```
+
+
+# Out of sample prediction: Orkney and Fair Isle
+
+A real test of our model is to predict for a set of sites where we don't have data. For this we use the "neighbouring" islands of Orkney, where there are also kittiwake colonies. Data for Orkney is included in the `ork` `data.frame`.
+
+```{r orkney-setup, fig.width=12, fig.height=9}
+ork <- st_as_sf(ork, coords=c("StartLong", "StartLat"))
+st_crs(ork) <- 4326
+
+(ggplot() +
+  geom_sf(data=ne_countries(country="United Kingdom", returnclass="sf",
+                            scale="large")) +
+  annotate(geom="text", x=-3, y=59, label="Orkney", size=8) +
+  annotate(geom="text", x=-3.5, y=58.4, label="Scotland", size=8) +
+  annotate(geom="text", x=-1.25, y=60.25, label="Shetland", size=8) +
+  coord_sf(xlim=c(-4,-0.2), ylim=c(58, 61), expand=FALSE) +
+  labs(x="", y="") +
+  theme_minimal())+
+(ggplot() +
+  geom_sf(data=ne_countries(country="United Kingdom", returnclass="sf",
+                            scale="large")) +
+  geom_sf_label(data=unique(ork[,c("Site", "geometry")]), aes(label=Site)) +
+  coord_sf(xlim=c(-3.5,-2.4), ylim=c(58.75, 59.5)) +
+  labs(x="", y="") +
+  theme_minimal())
+
+ggplot(ork, aes(x=Year, y=Fledg)) +
+  geom_point() +
+  geom_line() +
+  facet_wrap(~Site) +
+  labs(y="Fledgling count") +
+  theme_minimal()
+
+```
+
+### Orkney covariates
+
+We follow the same recipe as above to obtain SST values for Orkney. As we wrote functions above, we can re-use the code so this is rather more compact than the above.
+
+```{r orkney-sst}
+# transform to UK grid
+ork <- st_transform(ork, 27700)
+# terra format the data
+orkvec <- vect(ork)
+
+# extract the SST data
+orkcls <- lapply(1:nrow(orkvec), clippy, buff=buff, pt_data=orkvec,
+                 tweeks=tweeks)
+
+# get the centred coordinates
+orkcls <- lapply(seq_along(orkcls), function(i){
+  x <- orkcls[[i]]
+  x$xc <- x$x - st_coordinates(ork)[i,1]
+  x$yc <- x$y - st_coordinates(ork)[i,2]
+  x
+})
+
+# setup matrices
+ork$xc <- matrix(NA, nrow=nrow(ork), ncol=nrow(orkcls[[1]]))
+ork$yc <- matrix(NA, nrow=nrow(ork), ncol=nrow(orkcls[[1]]))
+ork$week <- matrix(NA, nrow=nrow(ork), ncol=nrow(orkcls[[1]]))
+ork$SST <- matrix(NA, nrow=nrow(ork), ncol=nrow(orkcls[[1]]))
+
+# push list data into the matrices
+for(i in 1:nrow(ork)){
+  ork$xc[i, ] <- orkcls[[i]]$xc
+  ork$yc[i, ] <- orkcls[[i]]$yc
+  ork$week[i, ] <- orkcls[[i]]$week
+  ork$SST[i, ] <- orkcls[[i]]$SST
+}
+
+# set NA values to 0
+ork$SST[is.na(ork$SST)] <- 0
+
+# change to polar coordinates
+ork$r <- sqrt(ork$yc^2 + ork$xc^2)
+ork$theta <- atan2(ork$yc, ork$xc)
+```
+
+## Making predictions for Orkney
+
+Having created a prediction `data.frame` we can then make predictions. Note that in this case, unlike the plots of the smooth surface, we keep the `matrix` format of the covariates, so we have single predictions per year-site combination.
+
+```{r pred-ork}
+# make prediction with standard error
+orkmp <- predict(m_SST, ork, se.fit=TRUE)
+# calculate the prediction and approximate 95% interval
+ork$fitted <- exp(orkmp$fit)
+ork$upper <- exp(orkmp$fit + 1.96*orkmp$se.fit)
+ork$lower <- exp(orkmp$fit - 1.96*orkmp$se.fit)
+```
+
+Plotting uses the same template as before:
+
+```{r ork-plot-pred, fig.width=12, fig.height=9}
+ggplot(ork, aes(x=Year)) +
+  geom_point(aes(y=Fledg), pch=23, colour="red") +
+  geom_line(aes(y=Fledg), colour="red") +
+  geom_point(aes(y=fitted)) +
+  geom_errorbar(aes(ymin=lower, ymax=upper)) +
+  facet_wrap(~Site, scale="free_y") +
+  scale_x_continuous(breaks=c(1993, seq(2000, 2020, by=5))) +
+  labs(y="Fledgling count") +
+  theme_minimal()
+```
+
+Again, these are not the most impressive plots we've ever seen. But again, bear in mind that we are only use SST to make predictions here and the model has seen none of these data before. About `r round(sum(ork$Fledg <= ork$upper & ork$Fledg >= ork$lower)/nrow(ork),0)`% of the observed counts are inside the 95% intervals.
+
+
+# Conclusions
+
+Here we've looked at how to construct a scalar-on-function regression terms for 2- and 3-dimensional phenomena and used them to model breeding success in kittiwakes. Although in this case the covariates we selected don't provide a highly accurate prediction, they do show that there is some signal in the data and perform better than simple averages of the covariate values. The added advantage of the ability to predict in new locations/times, which is risky with simple spatio-temporal smoothers, gives these models applicability in a broader set of situations.
+
+The main criticism of the models presented here should indeed be their relatively weak predictive power. However, we note that 1) the predictions to an unseen, out-of-sample situation is relatively good and 2) the performance is highly dependent on the proximity of the covariates to the causal mechanisms at play in the system being modelled. In our case the sea surface temperature is some distance from the actual fledgling success: its effect will be through prey availability, as well as other anthropogenic conditions. In the case of sandeel density, we are limited by the lack of temporal variability in the covariate, which is essential for the time series modelling we aim to acheive.
+
+Ensuring covariates that are causally proximate seems key to a good predictive model when using scalar-on-function regression. As is always the case, this involves careful thought and consultation with domain experts to determine a feasible modelling strategy.
