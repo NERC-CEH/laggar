@@ -3,7 +3,7 @@ Title: Data Manipulation for lag modelling
 Version: 0.0.0.9000
 Authors@R: c(
     person("Fiona", "Seaton", , "fseaton@ceh.ac.uk", role = c("aut", "cre")),
-    person("Dave", "Miller", , dave.miller"@bioss.ac.uk", role = "aut"),
+    person("Dave", "Miller", , "dave.miller@bioss.ac.uk", role = "aut"),
     person("Thomas", "Mondain-Monval", , "thoval@ceh.ac.uk", role = "aut"),
     person("Thomas", "Cornulier", , "thomas.cornulier@bioss.ac.uk", role = "aut")
     )
