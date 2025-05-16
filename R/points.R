@@ -1,17 +1,21 @@
 #' Sum number of points within distance and polygon
 #'
-#' @inheritParams get_pts_buffer
+#' @inheritParams lg_points
 #' @param dist The distance
 #'
 #' @returns list containing sum of points and area in buffer zone
 #' @export
 #'
 sum_within_dist <- function(x, y, poly, dist){
-  buff <- st_buffer(x, dist)
-  y_in_buff <- st_contains(buff, y)
+  buff <- sf::st_buffer(x, dist)
+  y_in_buff <- sf::st_contains(buff, y)
   sum_y_in_buff <- sapply(y_in_buff, length)
-  suppressWarnings(area_in_buff <- st_area(st_intersection(buff, poly)))
-  list(sum_y_in_buff,area_in_buff)
+  if(!is.null(poly)){
+    suppressWarnings(area_in_buff <- sf::st_area(sf::st_intersection(buff, poly)))
+  } else{
+    area_in_buff <- rep(NA, length(sum_y_in_buff))
+  }
+  list(npoints = sum_y_in_buff, area = area_in_buff)
 }
 
 
@@ -19,26 +23,40 @@ sum_within_dist <- function(x, y, poly, dist){
 #'
 #' @param x The measurement points
 #' @param y The points to be summed
-#' @param poly The polygon to be kept within
-#' @param mindist The minimum distance
-#' @param maxdist The maximum distance
-#' @param incdist The distance increment
+#' @param dist_seq The sequence of distance values
+#' @param poly Optional polygon to be kept within
+#' @param mindist The minimum distance, ignored if dist_seq is specified
+#' @param maxdist The maximum distance, ignored if dist_seq is specified
+#' @param incdist The distance increment, ignored if dist_seq is specified
 #'
-#' @returns list containing number of points and buffer area for every distance
-#'   increment
+#' @returns list containing matrices of the number of points
+#'   (\code{num_points}), buffer area (\code{buffer_area}) and average number of
+#'   points per unit area  (\code{points_parea}) for every distance increment.
+#'   All matrices will have number of rows equal to the number of measurement
+#'   points unless \code{poly = NULL} in which case \code{buffer_area} and
+#'   \code{points_parea} will be returned as \code{NA}.
 #' @export
 #'
-get_pts_buffer <- function(x, y, poly, mindist, maxdist, incdist){
-  dist <- seq(mindist,maxdist,incdist)
+lg_points <- function(x, y, dist_seq = NULL, poly = NULL,
+                      mindist = NULL, maxdist = NULL, incdist = NULL){
+  dist <- .index_check(minindex = mindist, maxindex = maxdist,
+                       incindex = incdist, index_seq = dist_seq)
   sumdist <- lapply(dist, sum_within_dist, x = x, y = y, poly = poly)
   num_points <- sapply(sumdist, "[[", 1)
-  buffer_area <- sapply(sumdist, "[[", 2)
 
   # convert from cumulative
   num_points <- t(apply(num_points, 1, function(x) diff(c(0,x))))
-  buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,x))))
-  buffer_area <- 1e-4*buffer_area #convert to hectares
+  if(!is.null(poly)){
+    buffer_area <- sapply(sumdist, "[[", 2)
+    buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,x))))
+    points_parea <- num_points/buffer_area
+  } else{
+    buffer_area <- NA
+    points_parea <- NA
+  }
 
   return(list(num_points = num_points,
-              buffer_area = buffer_area))
+              buffer_area = buffer_area,
+              points_parea = points_parea))
 }
+

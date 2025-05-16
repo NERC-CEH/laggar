@@ -11,7 +11,7 @@ sum_within_dist(x, y, poly, dist)
 
 \item{y}{The points to be summed}
 
-\item{poly}{The polygon to be kept within}
+\item{poly}{Optional polygon to be kept within}
 
 \item{dist}{The distance}
 }

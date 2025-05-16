@@ -1,0 +1,104 @@
+---
+title: "laggar"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{laggar}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(laggar)
+library(sf)
+library(ggplot2)
+library(mgcv)
+```
+
+# Simulate data
+
+```{r}
+set.seed(100230)
+boundary <- st_polygon(list(matrix(c(0,1000,1000,0,0,
+                                     0,0,1000,1000,0),ncol=2)))
+adults <- st_sample(boundary, size = 300)
+seedtraps <- data.frame(
+  x = rep(seq(50,950,100), 10),
+  y = rep(seq(50,950,100), each = 10)
+) |>
+  st_as_sf(coords = c("x","y"), remove = FALSE)
+ggplot() + geom_sf(data = boundary) + geom_sf(data = adults) +
+  geom_sf(data = seedtraps, colour = "red") +
+  theme_void()
+```
+
+Now simulate number of seeds by using number of trees within distance (ignoring boundary effects of polygon for this):
+
+```{r}
+vshort_distance <- sum_within_dist(seedtraps, adults, boundary, 10)
+short_distance <- sum_within_dist(seedtraps, adults, boundary, 25)
+medium_distance <- sum_within_dist(seedtraps, adults, boundary, 75)
+long_distance <- sum_within_dist(seedtraps, adults, boundary, 125)
+vlong_distance <- sum_within_dist(seedtraps, adults, boundary, 200)
+
+total_pred <- -0.5*short_distance[[1]] + 1*short_distance[[1]] +
+  0.2*medium_distance[[1]] + 
+  0.05*long_distance[[1]] + 0.01*vlong_distance[[1]]
+
+nseeds <- rpois(100, total_pred)
+```
+
+
+# Now do data prep
+
+Establish sequences of distance of interest
+
+```{r}
+dist_seq <- seq(10,200,10)
+```
+
+```{r}
+points_parea <- lg_points(seedtraps, adults, 
+                          dist_seq = dist_seq, poly = boundary)
+points_perha <- 1e4*points_parea$points_parea
+```
+
+
+Assemble into lagR object:
+
+```{r}
+lgr <- lg_assembly(response = nseeds, 
+                   covariate = points_perha, 
+                   index_seq = dist_seq)
+```
+
+Graphical checks:
+
+```{r}
+lg_plot(lgr)
+```
+
+
+
+# Model
+
+```{r}
+modfit <- gam(response ~ te(index, by = covariate, bs = "tp", k = 10),
+              data = lgr,
+              family = "poisson", method = "REML")
+```
+
+```{r}
+summary(modfit)
+```
+
+```{r}
+plot(modfit)
+```
+
