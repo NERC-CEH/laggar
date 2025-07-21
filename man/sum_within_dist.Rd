@@ -4,14 +4,14 @@
 \alias{sum_within_dist}
 \title{Sum number of points within distance and polygon}
 \usage{
-sum_within_dist(x, y, poly, dist)
+sum_within_dist(x, y, bound_poly, dist)
 }
 \arguments{
 \item{x}{The measurement points}
 
 \item{y}{The points to be summed}
 
-\item{poly}{Optional polygon to be kept within}
+\item{bound_poly}{Optional polygon to be kept within}
 
 \item{dist}{The distance}
 }

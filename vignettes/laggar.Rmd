@@ -14,6 +14,12 @@ knitr::opts_chunk$set(
 )
 ```
 
+```{r}
+# install laggar if not already installed
+# remotes::install_github("NERC-CEH/laggar")
+```
+
+
 ```{r setup}
 library(laggar)
 library(sf)
@@ -65,7 +71,7 @@ dist_seq <- seq(10,200,10)
 
 ```{r}
 points_parea <- lg_points(seedtraps, adults, 
-                          dist_seq = dist_seq, poly = boundary)
+                          dist_seq = dist_seq, bound_poly = boundary)
 points_perha <- 1e4*points_parea$points_parea
 ```
 
@@ -80,7 +86,7 @@ lgr <- lg_assembly(response = nseeds,
 
 Graphical checks:
 
-```{r}
+```{r, fig.dim = c(7,5)}
 lg_plot(lgr)
 ```
 
