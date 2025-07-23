@@ -13,11 +13,15 @@
 lg_assembly <- function(response, covariate,
                         index_seq = NULL,
                         minindex = NULL, maxindex = NULL, incindex = NULL){
-  index <- .index_check(minindex = minindex, maxindex = maxindex, incindex = incindex,
-                      index_seq = index_seq)
+  index <- .index_check(minindex = minindex, maxindex = maxindex,
+                        incindex = incindex, index_seq = index_seq)
   # checks
-  # check if response is a vector
+  # check if response is a numeric vector
+  if(!class(response) %in% c("integer","numeric"))
+    stop("response must be a numeric or integer vector")
   # check if covariate is a matrix
+  if(!("matrix" %in% class(covariate)))
+    stop("covariate must be a matrix")
 
   if(!identical(nrow(covariate), length(response)))
     stop("number of rows of response must be equal to length of covariate")
@@ -63,10 +67,25 @@ lg_assembly <- function(response, covariate,
 
 
 
+### Helper functions ########################
+
+.sf_conversion <- function(object, name = "object"){
+  if(!(any(c("sf","sfc","sfg") %in% class(object)))){
+    message(paste("Converting",name,"to sf object"))
+    object <- sf::st_as_sf(object)
+  }
+  return(object)
+}
+
+
 .index_check <- function(minindex,maxindex,incindex,index_seq){
-  if(is.null(c(minindex,maxindex,incindex,index_seq)))
+  if(any(c(is.null(minindex),is.null(maxindex),is.null(incindex))) & is.null(index_seq))
     stop("Either index_seq or minindex, maxindex and incindex must be specified")
   if(is.null(index_seq)){
+    if(!all(is.numeric(minindex),is.numeric(maxindex),is.numeric(incindex)))
+      stop("minindex, maxindex and incindex must be numeric")
+    if(!all(length(minindex)==1,length(maxindex)==1,length(incindex)==1))
+      stop("minindex, maxindex and incindex must be of length 1")
     if(minindex <= 0){
       stop("minindex must be greater than 0")
     }
@@ -75,6 +94,10 @@ lg_assembly <- function(response, covariate,
     }
     index <- seq(minindex,maxindex,incindex)
   } else{
+    if(!is.numeric(index_seq))
+      stop("index_seq must be numeric")
+    if(length(index_seq) < 2)
+      stop("index_seq must be of length greater than 1")
     if(min(index_seq)<= 0){
       stop("Smallest indexance increment must be greater than 0")
     }

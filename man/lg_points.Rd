@@ -8,7 +8,7 @@ lg_points(
   x,
   y,
   dist_seq = NULL,
-  poly = NULL,
+  bound_poly = NULL,
   mindist = NULL,
   maxdist = NULL,
   incdist = NULL
@@ -21,7 +21,7 @@ lg_points(
 
 \item{dist_seq}{The sequence of distance values}
 
-\item{poly}{Optional polygon to be kept within}
+\item{bound_poly}{Optional polygon to be kept within}
 
 \item{mindist}{The minimum distance, ignored if dist_seq is specified}
 
@@ -34,7 +34,7 @@ list containing matrices of the number of points
 (\code{num_points}), buffer area (\code{buffer_area}) and average number of
 points per unit area  (\code{points_parea}) for every distance increment.
 All matrices will have number of rows equal to the number of measurement
-points unless \code{poly = NULL} in which case \code{buffer_area} and
+points unless \code{bound_poly = NULL} in which case \code{buffer_area} and
 \code{points_parea} will be returned as \code{NA}.
 }
 \description{
