@@ -31,7 +31,9 @@ lg_assembly <- function(response, covariate,
     if(all(cov_na_index)){
       stop("covariate matrix has NAs present in every row")
     } else{
-      message("Removing rows where covariate matrix has NAs")
+      message(paste("Removing", sum(cov_na_index),
+                    ifelse(sum(cov_na_index) == 1, "row", "rows"),
+                    "where covariate matrix has NAs"))
       cov_notna_index <- !cov_na_index
     }
   } else{
@@ -42,7 +44,9 @@ lg_assembly <- function(response, covariate,
     if(all(resp_na_index)){
       stop("Response is entirely NAs")
     } else{
-      message("Removing rows where response is NA")
+      message(paste("Removing", sum(resp_na_index),
+                    ifelse(sum(resp_na_index) == 1, "row", "rows"),
+                    "where response is NA"))
       resp_notna_index <- !resp_na_index
     }
   }else{

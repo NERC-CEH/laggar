@@ -22,7 +22,7 @@ test_that("lg_assembly handles NAs correctly", {
 
   expect_message(a1 <- lg_assembly(1:4, matrix(c(1:19,NA), nrow=4),
                                    index_seq = seq(1,5,1)),
-                 "Removing rows where covariate matrix has NAs")
+                 "Removing 1 row where covariate matrix has NAs")
   expect_named(a1, c("response", "covariate", "index"))
   expect_length(a1$response, 3)
   expect_equal(dim(a1$covariate),c(3,5))
@@ -31,7 +31,7 @@ test_that("lg_assembly handles NAs correctly", {
 
   expect_message(a2 <- lg_assembly(c(1,NA,NA,4), matrix(1:20, nrow=4),
                                    index_seq = seq(1,5,1)),
-                 "Removing rows where response is NA")
+                 "Removing 2 rows where response is NA")
   expect_named(a2, c("response", "covariate", "index"))
   expect_length(a2$response, 2)
   expect_equal(dim(a2$covariate),c(2,5))
