@@ -17,6 +17,7 @@ lg_plot(...)
   covariate = "covariate",
   index = "index",
   widths = c(0.1, 0.5, 0.5),
+  plot_index = FALSE,
   ...
 )
 
@@ -26,6 +27,7 @@ lg_plot(...)
   covariate = "covariate",
   index = "index",
   widths = c(0.1, 0.5, 0.5),
+  plot_index = FALSE,
   ...
 )
 }
@@ -41,6 +43,8 @@ lg_plot(...)
 \item{index}{string giving the name of the matrix-column with index values in it}
 
 \item{widths}{the widths of the different plots}
+
+\item{plot_index}{Whether to plot the index plot, by default \code{FALSE}}
 }
 \value{
 a \code{patchwork} combination of \code{ggplot2} objects
