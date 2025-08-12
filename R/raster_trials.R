@@ -47,7 +47,9 @@ ggplot() +
 # Function to extract sum of data within an area
 sum_within_dist_rast <- function(x, y, dist) {
 
-  terra::crs(y) <- 27700
+
+  # ## need to create a coordinate system to try and get area I think...
+  # terra::crs(y) <- 27700
 
   # buffer point
   buff <- terra::vect(sf::st_buffer(x, dist))
