@@ -53,18 +53,16 @@ ggplot() +
 
 
 
-# Function to extract sum of data within an area
-sum_within_dist_rast <- function(x, y, dist) {
-
-  # ## need to create a coordinate system to try and get area I think...
-  # terra::crs(y) <- 27700
+# Function to extract data within an area
+# this works with a custom function
+sum_within_dist_rast <- function(x, y, dist, func = sum) {
 
   # buffer point
   buff <- terra::vect(sf::st_buffer(x, dist))
 
   # ggplot() +
   #   geom_tile(data = y, aes(x, y, fill = lyr.1)) +
-  #   geom_sf(data = buff) +
+  #   geom_sf(data = buff, alpha = 0.1) +
   #   scale_fill_viridis_c()
 
   # calculate cell area covered
@@ -74,39 +72,24 @@ sum_within_dist_rast <- function(x, y, dist) {
   comb <- c(y, area)
 
   # get values
+  #this handles edges i.e.won't count cells that aren't there
   val <- terra::extract(comb, buff,
                         xy = TRUE,
                         touches = TRUE, # all cells that are touched by buffer, not just centroid
                         exact = TRUE)
 
-  # calculate value based on the proportion of each cell within each buffered area
-  ## I don't think this makes sense, have a look at it properly.
-
-  head(val)
+  # calculate the area of the cell that is covered by the ppolygons
   val$amount_cell_in <- val$area*val$fraction
-  head(val)
 
-  # ## I think this is right!
-  # ## BUT, need to make sure it's weighted by area that we need...
-  # outs <- val %>%
-  #   group_by(ID) %>%
-  #   summarise(rain_by_area = sum(lyr.1)/sum(amount_cell_in), ## the amount per unit area
-  #   mean_rain = mean(lyr.1),
-  #   weighted_mean_rain = weighted.mean(lyr.1, amount_cell_in))
-
-
-
-  summed_val <- as.numeric(tapply(val[,names(y)], val$ID, sum))
+  summed_val <- as.numeric(tapply(val[,names(y)], val$ID, func))
   area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
-  sumperarea <- summed_val / area
+  # sumperarea <- summed_val / area
+  # mean_val <- as.numeric(tapply(val[,names(y)], val$ID, mean))
 
   # commenting out to be consistent with sum_within_dist
   list(summed_val = summed_val, area = area)#, sumperarea = sumperarea)
 
 }
-
-
-
 
 
 
@@ -167,7 +150,7 @@ maxdist = NULL
 incdist = NULL
 bound_poly = NULL
 
-lg_rast <- function(x, y, dist_seq = NULL, bound_poly = NULL, mindist = NULL,
+lg_rast <- function(x, y, dist_seq = NULL, func = "sum", bound_poly = NULL, mindist = NULL,
                     maxdist = NULL, incdist = NULL) {
   x <- .sf_conversion(x, "x")
   y <- .sf_conversion(y, "y")
@@ -186,7 +169,7 @@ lg_rast <- function(x, y, dist_seq = NULL, bound_poly = NULL, mindist = NULL,
 
   dist <- .index_check(minindex = mindist, maxindex = maxdist,
                        incindex = incdist, index_seq = dist_seq)
-  sumdist <- lapply(dist, sum_within_dist_rast, x = x, y = y)#, bound_poly = bound_poly)
+  sumdist <- lapply(dist, sum_within_dist_rast, x = x, y = y, func = func)#, bound_poly = bound_poly)
   num_points <- sapply(sumdist, "[[", 1)
   num_points <- t(apply(num_points, 1, function(x) diff(c(0,
                                                           x))))
