@@ -49,15 +49,23 @@ ggplot() +
   scale_fill_viridis_c()
 
 
+
+
+
+
 # Function to extract sum of data within an area
 sum_within_dist_rast <- function(x, y, dist) {
-
 
   # ## need to create a coordinate system to try and get area I think...
   # terra::crs(y) <- 27700
 
   # buffer point
   buff <- terra::vect(sf::st_buffer(x, dist))
+
+  # ggplot() +
+  #   geom_tile(data = y, aes(x, y, fill = lyr.1)) +
+  #   geom_sf(data = buff) +
+  #   scale_fill_viridis_c()
 
   # calculate cell area covered
   area <- terra::cellSize(y, unit = "m")
@@ -66,9 +74,10 @@ sum_within_dist_rast <- function(x, y, dist) {
   comb <- c(y, area)
 
   # get values
-  val <- terra::extract(comb, buff, xy = TRUE,
+  val <- terra::extract(comb, buff,
+                        xy = TRUE,
+                        touches = TRUE, # all cells that are touched by buffer, not just centroid
                         exact = TRUE)
-
 
   # calculate value based on the proportion of each cell within each buffered area
   ## I don't think this makes sense, have a look at it properly.
@@ -77,61 +86,192 @@ sum_within_dist_rast <- function(x, y, dist) {
   val$amount_cell_in <- val$area*val$fraction
   head(val)
 
-  ## I think this is right!
-  ## BUT, need to make sure it's weighted by area that we need...
-  outs <- val %>%
-    group_by(ID) %>%
-    summarise(rain_by_area = sum(lyr.1)/sum(amount_cell_in), ## the amount per unit area
-    mean_rain = mean(lyr.1),
-    weighted_mean_rain = weighted.mean(lyr.1, amount_cell_in))
+  # ## I think this is right!
+  # ## BUT, need to make sure it's weighted by area that we need...
+  # outs <- val %>%
+  #   group_by(ID) %>%
+  #   summarise(rain_by_area = sum(lyr.1)/sum(amount_cell_in), ## the amount per unit area
+  #   mean_rain = mean(lyr.1),
+  #   weighted_mean_rain = weighted.mean(lyr.1, amount_cell_in))
 
-
-
-
-
-
-
-  # terra::zonal(y, buff, fun="sum", touches = TRUE, exact = TRUE)
-
-
-  # ## This bit of code is a work in progress to get area
-  # summed_val <- tapply(sumdist[,names(y)], val$ID, sum)
-  # # ## fraction doesn't give us area! It gives us proportion of each cell that is covered.
-  # # area <- tapply(val$fraction, val$ID, sum)
-  # area <- expanse(buff)
-  # suppressWarnings(area_in_buff <- sf::st_area(sf::st_intersection(buff, poly)))
-  # terra::intersect(y, buff)
-  # ##
-
-  ## need to get the intersection between each buffered area and the raster
-  ## and then the area
-
-  # # sum the values ----- CHECK TO SEE ABOUT BOUNDARY CASES
-  # out_list <- lapply(1:length(unique(val$ID)), function(x) {
-  #   list(summed_value = sum(val$lyr.1[val$ID == unique(val$ID)[x]]),
-  #        area =  sum(val$fraction[val$ID == unique(val$ID)[x]]))
-  # })
-  # outs <- lapply(1:length(out_list[[1]]), function(x) sapply(out_list, "[[", x))
-  # names(outs) <- names(out_list[[1]])
 
 
   summed_val <- as.numeric(tapply(val[,names(y)], val$ID, sum))
   area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
   sumperarea <- summed_val / area
 
-  list(summed_val = summed_val, area = area, sumperarea = sumperarea)
-
-  # list(npoints = sum_y_in_buff, area = area_in_buff)
+  # commenting out to be consistent with sum_within_dist
+  list(summed_val = summed_val, area = area)#, sumperarea = sumperarea)
 
 }
 
 
+
+
+
+
+############### Original POINTS code uses lg_points
+############### I think changing sum_within_dist function is enough
+# lg_points <-
+# function (x, y, dist_seq = NULL, bound_poly = NULL, mindist = NULL,
+#     maxdist = NULL, incdist = NULL)
+# {
+#     x <- .sf_conversion(x, "x")
+#     y <- .sf_conversion(y, "y")
+#     if (!all(sf::st_geometry_type(x) == "POINT"))
+#         stop("x must be a sf object including only POINT geometries")
+#     if (!all(sf::st_geometry_type(y) == "POINT"))
+#         stop("y must be a sf object including only POINT geometries")
+#     if (!is.null(bound_poly)) {
+#         bound_poly <- .sf_conversion(bound_poly, "bound_poly")
+#         if (length(bound_poly) != 1 | length(sf::st_geometry_type(bound_poly)) !=
+#             1)
+#             stop("bound_poly must be a sf object comprising a single polygon")
+#         if (sf::st_geometry_type(bound_poly) != "POLYGON")
+#             stop("bound_poly must be a sf object comprising a single polygon")
+#     }
+#     dist <- .index_check(minindex = mindist, maxindex = maxdist,
+#         incindex = incdist, index_seq = dist_seq)
+#     sumdist <- lapply(dist, sum_within_dist, x = x, y = y, bound_poly = bound_poly)
+#     num_points <- sapply(sumdist, "[[", 1)
+#     num_points <- t(apply(num_points, 1, function(x) diff(c(0,
+#         x))))
+#     if (!is.null(bound_poly)) {
+#         buffer_area <- sapply(sumdist, "[[", 2)
+#         buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,
+#             x))))
+#         points_parea <- num_points/buffer_area
+#     }
+#     else {
+#         buffer_area <- NA
+#         points_parea <- NA
+#     }
+#     return(list(num_points = num_points, buffer_area = buffer_area,
+#         points_parea = points_parea))
+# }
+
+
+.sf_conversion <- function(object, name = "object"){
+  if(!(any(c("sf","sfc","sfg") %in% class(object)))){
+    message(paste("Converting",name,"to sf object"))
+    object <- sf::st_as_sf(object)
+  }
+  return(object)
+}
+
+x = seedtraps
+y = renv
+dist_seq = c(20, 40)
+mindist = NULL
+maxdist = NULL
+incdist = NULL
+bound_poly = NULL
+
+lg_rast <- function(x, y, dist_seq = NULL, bound_poly = NULL, mindist = NULL,
+                    maxdist = NULL, incdist = NULL) {
+  x <- .sf_conversion(x, "x")
+  y <- .sf_conversion(y, "y")
+  if (!all(sf::st_geometry_type(x) == "POINT"))
+    stop("x must be a sf object including only POINT geometries")
+  if (!all(sf::st_geometry_type(y) == "POINT"))
+    stop("y must be a sf object including only POINT geometries")
+  if (!is.null(bound_poly)) {
+    bound_poly <- .sf_conversion(bound_poly, "bound_poly")
+    if (length(bound_poly) != 1 | length(sf::st_geometry_type(bound_poly)) !=
+        1)
+      stop("bound_poly must be a sf object comprising a single polygon")
+    if (sf::st_geometry_type(bound_poly) != "POLYGON")
+      stop("bound_poly must be a sf object comprising a single polygon")
+  }
+
+  dist <- .index_check(minindex = mindist, maxindex = maxdist,
+                       incindex = incdist, index_seq = dist_seq)
+  sumdist <- lapply(dist, sum_within_dist_rast, x = x, y = y)#, bound_poly = bound_poly)
+  num_points <- sapply(sumdist, "[[", 1)
+  num_points <- t(apply(num_points, 1, function(x) diff(c(0,
+                                                          x))))
+  if (!is.null(bound_poly)) {
+    buffer_area <- sapply(sumdist, "[[", 2)
+    buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,
+                                                              x))))
+    points_parea <- num_points/buffer_area
+  }
+  else {
+    buffer_area <- NA
+    points_parea <- NA
+  }
+  return(list(num_points = num_points, buffer_area = buffer_area,
+              points_parea = points_parea))
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+dist <- laggar:::.index_check(minindex = NULL, maxindex = NULL,
+                              incindex = NULL, index_seq = NULL)
+
+
+sum_within_dist(x = seedtraps, y = adults, poly = poly, dist = 20)
+
+
+dist_seq <- c(20)
+
 ### this works but takes a while with big buffer areas because of extract function presumably
-tst <- sum_within_dist_rast(x = seedtraps,
-                            y = renv,
-                            dist = 100)
+sumdist <- sum_within_dist_rast(x = seedtraps,
+                                y = renv,
+                                dist = 100)
+
+## sum the number of points within dist of each seedtrap
+sumdist <- lapply(dist_seq, sum_within_dist, x = x, y = y, poly = poly)
+
+## no idea what this does
+num_points <- sapply(sumdist, "[[", 1) # extracts the first item in each sublist, i.e. npoints
+num_points <- t(apply(num_points, 1, function(x) diff(c(0,
+                                                        x))))
+
+
+if (!is.null(poly)) {
+  buffer_area <- sapply(sumdist, "[[", 2)
+  buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,
+                                                            x))))
+  points_parea <- num_points/buffer_area
+} else {
+  buffer_area <- NA
+  points_parea <- NA
+}
+return(list(num_points = num_points, buffer_area = buffer_area,
+            points_parea = points_parea))
+
 
 tst
+
+points_perha <- 1e4*tst$sumperarea
+
+lgr <- lg_assembly(response = nseeds,
+                   covariate = points_perha,
+                   index_seq = dist_seq)
+
+
 dist_seq <- seq(10,200,10)
 
 ## sum the number of points within dist of each seedtrap

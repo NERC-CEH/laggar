@@ -77,7 +77,7 @@ dist <- laggar:::.index_check(minindex = NULL, maxindex = NULL,
                               incindex = NULL, index_seq = NULL)
 
 
-sum_within_dist(x = x, y = y, poly = poly, dist = 20)
+sum_within_dist(x = x, y = y, bound_poly = bound_poly, dist = 20)
 
 ## sum the number of points within dist of each seedtrap
 sumdist <- lapply(dist_seq, sum_within_dist, x = x, y = y, poly = poly)
@@ -102,14 +102,11 @@ return(list(num_points = num_points, buffer_area = buffer_area,
 
 
 
-
-# get number of points (number of trees?) within varying distances
+## original code from vignette...
 points_parea <- lg_points(seedtraps, adults, 
-                          dist_seq = dist_seq, poly = boundary)
-## so this will need to change for a raster object...
-
-# is this changing it to per hectare?
+                          dist_seq = dist_seq, bound_poly = boundary)
 points_perha <- 1e4*points_parea$points_parea
+
 ```
 
 
