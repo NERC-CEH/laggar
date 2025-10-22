@@ -15,28 +15,33 @@ boundary <- st_polygon(list(matrix(c(0,1000,1000,0,0,
 
 adults <- st_sample(boundary, size = 300)
 
+# st_crs(boundary) <- "EPSG:27700"
+
 seedtraps <- data.frame(
   x = rep(seq(50,950,100), 10),
   y = rep(seq(50,950,100), each = 10)
 ) |>
-  st_as_sf(coords = c("x","y"), remove = FALSE)
+  st_as_sf(coords = c("x","y"), remove = FALSE,
+           crs = "EPSG:27700")
 
 
-ggplot() + geom_sf(data = boundary) + geom_sf(data = adults) +
-  geom_sf(data = seedtraps, colour = "red") +
-  theme_void()
+# ggplot() + geom_sf(data = boundary) + geom_sf(data = adults) +
+#   geom_sf(data = seedtraps, colour = "red") +
+#   theme_void()
 
 # rasterize(boundary)
 
+
+### simulate data ---------------------------------------
 # create empty raster
-r <- rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "PROJ.4")
+r <- rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:27700")
 
 # simulate rainfall data
 renv <- simulate_data(x = r, n = 1, scale = 0.8, intensity = 22, sd = 1)
 plot(renv)
+# ---------------------------
 
-class(renv)
-
+## plot
 ggplot() +
   geom_spatraster(data = renv) +
   # geom_spatvector(data = terra::vect(buff), alpha = 0.5) +
@@ -54,18 +59,51 @@ sum_within_dist_rast <- function(x, y, dist) {
   # buffer point
   buff <- terra::vect(sf::st_buffer(x, dist))
 
+  # calculate cell area covered
+  area <- terra::cellSize(y, unit = "m")
+
+  # combine environmental and cell area
+  comb <- c(y, area)
+
   # get values
-  val <- terra::extract(y, buff, xy = TRUE,
-                        exact = TRUE )
+  val <- terra::extract(comb, buff, xy = TRUE,
+                        exact = TRUE)
 
-  summed_val <- tapply(sumdist[,names(y)], val$ID, sum)
-  # ## fraction doesn't give us area! It gives us proportion of each cell that is covered.
-  # area <- tapply(val$fraction, val$ID, sum)
-  area <- expanse(buff)
-  suppressWarnings(area_in_buff <- sf::st_area(sf::st_intersection(buff, poly)))
-  terra::intersect(y, buff)
 
-  ## need to get the intersection between each buffered aread and the raster
+  # calculate value based on the proportion of each cell within each buffered area
+  ## I don't think this makes sense, have a look at it properly.
+
+  head(val)
+  val$amount_cell_in <- val$area*val$fraction
+  head(val)
+
+  ## I think this is right!
+  ## BUT, need to make sure it's weighted by area that we need...
+  outs <- val %>%
+    group_by(ID) %>%
+    summarise(rain_by_area = sum(lyr.1)/sum(amount_cell_in), ## the amount per unit area
+    mean_rain = mean(lyr.1),
+    weighted_mean_rain = weighted.mean(lyr.1, amount_cell_in))
+
+
+
+
+
+
+
+  # terra::zonal(y, buff, fun="sum", touches = TRUE, exact = TRUE)
+
+
+  # ## This bit of code is a work in progress to get area
+  # summed_val <- tapply(sumdist[,names(y)], val$ID, sum)
+  # # ## fraction doesn't give us area! It gives us proportion of each cell that is covered.
+  # # area <- tapply(val$fraction, val$ID, sum)
+  # area <- expanse(buff)
+  # suppressWarnings(area_in_buff <- sf::st_area(sf::st_intersection(buff, poly)))
+  # terra::intersect(y, buff)
+  # ##
+
+  ## need to get the intersection between each buffered area and the raster
   ## and then the area
 
   # # sum the values ----- CHECK TO SEE ABOUT BOUNDARY CASES
@@ -78,7 +116,7 @@ sum_within_dist_rast <- function(x, y, dist) {
 
 
   summed_val <- as.numeric(tapply(val[,names(y)], val$ID, sum))
-  area <- as.numeric(tapply(val$fraction, val$ID, sum))
+  area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
   sumperarea <- summed_val / area
 
   list(summed_val = summed_val, area = area, sumperarea = sumperarea)
