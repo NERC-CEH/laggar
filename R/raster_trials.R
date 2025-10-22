@@ -55,15 +55,31 @@ ggplot() +
 
 # Function to extract data within an area
 # this works with a custom function
+## testing
+x = seedtraps[1,]
+y = renv
+dist = c(10, 20, 40)
+func = sum
 sum_within_dist_rast <- function(x, y, dist, func = sum) {
 
   # buffer point
   buff <- terra::vect(sf::st_buffer(x, dist))
 
-  # ggplot() +
-  #   geom_tile(data = y, aes(x, y, fill = lyr.1)) +
-  #   geom_sf(data = buff, alpha = 0.1) +
-  #   scale_fill_viridis_c()
+  buff <- lapply(dist, sf::st_buffer, x = x)
+
+  ggplot() +
+    geom_tile(data = y, aes(x, y, fill = lyr.1)) +
+    geom_sf(data = buff[[3]], alpha = 1) +
+    scale_fill_viridis_c()
+
+
+  donut_ind <- c(0, 1:length(buff))
+  donut_ind
+
+  seq_along(c(0, buff))
+
+
+  plot(st_geometry(sf::st_difference(buff[[2]],buff[[1]])), col = "red")
 
   # calculate cell area covered
   area <- terra::cellSize(y, unit = "m")
@@ -91,6 +107,32 @@ sum_within_dist_rast <- function(x, y, dist, func = sum) {
 
 }
 
+library(sf)
+library(purrr)
+
+
+##### This is a function that creates donuts
+sequential_difference <- function(poly_list) {
+  # Ensure input is a list of sfc or sfg objects
+  stopifnot(is.list(poly_list))
+  n <- length(poly_list)
+
+  if (n < 2) stop("Need at least two polygons.")
+
+  # Apply st_difference sequentially
+  diffs <- map2( poly_list[-1], poly_list[-n], st_difference)
+
+  # Return as an sfc geometry collection
+  do.call(rbind, diffs)
+}
+
+
+polys <- list(buff)
+
+# Sequential difference
+donuts <- sequential_difference(buff)
+
+plot(st_geometry(donuts), col = c("lightblue", "lightgreen"), border = "black")
 
 
 ############### Original POINTS code uses lg_points
