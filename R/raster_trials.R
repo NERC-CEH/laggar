@@ -7,6 +7,7 @@ library(laggar)
 library(sf)
 library(ggplot2)
 library(mgcv)
+library(purrr)
 
 ## simulate data
 set.seed(100230)
@@ -49,6 +50,25 @@ ggplot() +
   scale_fill_viridis_c()
 
 
+##### This is a function that creates donuts
+doughnut_builder <- function(poly_list) {
+  # Ensure input is a list of sfc or sfg objects
+  stopifnot(is.list(poly_list))
+  n <- length(poly_list)
+
+  if (n < 2) stop("Need at least two polygons.")
+
+  # Apply st_difference sequentially
+  diffs <- map2( poly_list[-1], poly_list[-n], st_difference)
+
+  # Return as an sfc geometry collection
+  diffs <- do.call(rbind, diffs)
+
+  #remove second coordinates
+  diffs[, grep(".1", colnames(diffs))] <- NULL
+  diffs
+}
+
 
 
 
@@ -56,10 +76,11 @@ ggplot() +
 # Function to extract data within an area
 # this works with a custom function
 ## testing
-x = seedtraps[1,]
+x = seedtraps
 y = renv
-dist = c(10, 20, 40)
+dist = c(10, 20)
 func = sum
+
 sum_within_dist_rast <- function(x, y, dist, func = sum) {
 
   # buffer point
@@ -67,19 +88,19 @@ sum_within_dist_rast <- function(x, y, dist, func = sum) {
 
   buff <- lapply(dist, sf::st_buffer, x = x)
 
-  ggplot() +
-    geom_tile(data = y, aes(x, y, fill = lyr.1)) +
-    geom_sf(data = buff[[3]], alpha = 1) +
-    scale_fill_viridis_c()
+  # ggplot() +
+  #   geom_tile(data = y, aes(x, y, fill = lyr.1)) +
+  #   geom_sf(data = buff[[3]], alpha = 1) +
+  #   scale_fill_viridis_c()
 
+  donuts <- doughnut_builder(buff)
+  buff_donuts <- rbind(buff[[1]], donuts)
 
-  donut_ind <- c(0, 1:length(buff))
-  donut_ind
-
-  seq_along(c(0, buff))
-
-
-  plot(st_geometry(sf::st_difference(buff[[2]],buff[[1]])), col = "red")
+  # plot(st_geometry(buff_donuts[5,]), col = c("black"))
+  # plot(st_geometry(buff_donuts[4,]), col = c("yellow"), add = TRUE)
+  # plot(st_geometry(buff_donuts[3,]), col = c("green", "yellow", "black"), add = TRUE)
+  # plot(st_geometry(buff_donuts[2,]), col = c("blue", "green", "yellow", "black"), add = TRUE)
+  # plot(st_geometry(buff_donuts[1,]), col = c("red", "blue", "green", "yellow", "black"), add = TRUE)
 
   # calculate cell area covered
   area <- terra::cellSize(y, unit = "m")
@@ -89,10 +110,10 @@ sum_within_dist_rast <- function(x, y, dist, func = sum) {
 
   # get values
   #this handles edges i.e.won't count cells that aren't there
-  val <- terra::extract(comb, buff,
-                        xy = TRUE,
-                        touches = TRUE, # all cells that are touched by buffer, not just centroid
-                        exact = TRUE)
+  system.time(val <- terra::extract(comb, buff_donuts,
+                                    xy = TRUE,
+                                    touches = TRUE, # all cells that are touched by buffer, not just centroid
+                                    exact = TRUE))
 
   # calculate the area of the cell that is covered by the ppolygons
   val$amount_cell_in <- val$area*val$fraction
@@ -111,28 +132,13 @@ library(sf)
 library(purrr)
 
 
-##### This is a function that creates donuts
-sequential_difference <- function(poly_list) {
-  # Ensure input is a list of sfc or sfg objects
-  stopifnot(is.list(poly_list))
-  n <- length(poly_list)
 
-  if (n < 2) stop("Need at least two polygons.")
-
-  # Apply st_difference sequentially
-  diffs <- map2( poly_list[-1], poly_list[-n], st_difference)
-
-  # Return as an sfc geometry collection
-  do.call(rbind, diffs)
-}
-
-
-polys <- list(buff)
-
-# Sequential difference
-donuts <- sequential_difference(buff)
-
-plot(st_geometry(donuts), col = c("lightblue", "lightgreen"), border = "black")
+# polys <- list(buff)
+#
+# # Sequential difference
+# donuts <- sequential_difference(buff)
+#
+# plot(st_geometry(donuts), col = c("lightblue", "lightgreen"), border = "black")
 
 
 ############### Original POINTS code uses lg_points
@@ -212,6 +218,9 @@ lg_rast <- function(x, y, dist_seq = NULL, func = "sum", bound_poly = NULL, mind
   dist <- .index_check(minindex = mindist, maxindex = maxdist,
                        incindex = incdist, index_seq = dist_seq)
   sumdist <- lapply(dist, sum_within_dist_rast, x = x, y = y, func = func)#, bound_poly = bound_poly)
+
+  sum_within_dist_rast(x=x, y=y, func=func, dist = dist_seq)
+
   num_points <- sapply(sumdist, "[[", 1)
   num_points <- t(apply(num_points, 1, function(x) diff(c(0,
                                                           x))))
