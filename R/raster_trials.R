@@ -49,58 +49,7 @@ ggplot() +
   geom_point(data = seedtraps, aes(x, y), colour = "black") +
   scale_fill_viridis_c()
 
-
-# ##### This is a function that creates donuts
-# doughnut_builder <- function(poly_list) {
-#   # Ensure input is a list of sfc or sfg objects
-#   stopifnot(is.list(poly_list))
-#   n <- length(poly_list)
-#
-#   if (n < 2) stop("Need at least two polygons.")
-#
-#   # Apply st_difference sequentially
-#   diffs <- map2(poly_list[-1], poly_list[-n], st_difference)
-#
-#   # Return as an sfc geometry collection
-#   diffs <- do.call(rbind, diffs)
-#
-#   #remove second coordinates
-#   diffs[, grep(".1", colnames(diffs))] <- NULL
-#
-#   # add ID column
-#   diffs$ID <- 1:nrow(diffs)
-#
-#   diffs
-# }
-
-
-# doughnut_builder <- function(polys) {
-#   # # Handle sf or sfc objects by converting to list of geometries
-#   # if (inherits(polys, "sf")) {
-#   #   poly_list <- st_geometry(polys)
-#   # } else if (inherits(polys, "sfc")) {
-#   #   poly_list <- polys
-#   # } else if (is.list(polys)) {
-#   #   poly_list <- st_sfc(polys)
-#   # } else {
-#   #   stop("Input must be a list of polygons, sfc, or sf object.")
-#   # }
-#
-#   n <- length(poly_list)
-#   if (n < 2) stop("Need at least two polygons.")
-#
-#   # For each k ≥ 2, compute poly_k - union(poly_1:(k-1))
-#   results <- map(2:n, function(k) {
-#     st_difference(poly_list[[k]], st_union(poly_list[1:(k - 1)]))
-#   })
-#
-#   # Return tidy sf object
-#   st_sf(
-#     ID = paste0("donut_", 2:n),
-#     geometry = st_sfc(results)
-#   )
-# }
-
+# function to create doughnuts
 doughnut_builder <- function(poly_list) {
   # Validate input
   stopifnot(is.list(poly_list), all(map_lgl(poly_list, ~ inherits(.x, "sf"))))
