@@ -8,38 +8,55 @@ library(sf)
 library(ggplot2)
 library(mgcv)
 library(purrr)
+library(tictoc)
 
-## simulate data
+## choose projection, BNG or latlong
+bng = FALSE
+
+## simulate data --- metres
 set.seed(100230)
+# if(bng){
 boundary <- st_polygon(list(matrix(c(0,1000,1000,0,0,
                                      0,0,1000,1000,0),ncol=2)))
 
 adults <- st_sample(boundary, size = 300)
 
-# st_crs(boundary) <- "EPSG:27700"
 
 seedtraps <- data.frame(
   x = rep(seq(50,950,100), 10),
   y = rep(seq(50,950,100), each = 10)
 ) |>
   st_as_sf(coords = c("x","y"), remove = FALSE,
-           crs = "EPSG:27700")
+           crs = "EPSG:32630")
+
+r <- rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:32630")
 
 
-# ggplot() + geom_sf(data = boundary) + geom_sf(data = adults) +
-#   geom_sf(data = seedtraps, colour = "red") +
-#   theme_void()
-
-# rasterize(boundary)
-
+# } else {
+#   ## simulate data --- latlong
+#   set.seed(100230)
+#   boundary <- st_polygon(list(matrix(c(0,100,100,0,0,
+#                                        0,0,100,100,0),ncol=2)))
+#
+#   adults <- st_sample(boundary, size = 300)
+#
+#   seedtraps <- data.frame(
+#     x = rep(seq(5,95,10), 10),
+#     y = rep(seq(5,95,10), each = 10)
+#   ) |>
+#     st_as_sf(coords = c("x","y"), remove = FALSE,
+#              crs = "EPSG:32630")
+#
+#   r <- rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:32630")
+#
+# }
 
 ### simulate data ---------------------------------------
 # create empty raster
-r <- rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:27700")
 
 # simulate rainfall data
 renv <- simulate_data(x = r, n = 1, scale = 0.8, intensity = 22, sd = 1)
-plot(renv)
+# plot(renv)
 # ---------------------------
 
 ## plot
@@ -84,10 +101,24 @@ doughnut_builder <- function(poly_list) {
 ## testing
 x = seedtraps
 y = renv
-dist = c(10, 20, 30)
-func = sum
+# if(bng){
+dist = c(10, 20, 30) #} else {
+#   dist = c(10000, 20000, 30000)
+# }
+func = "sum"
 
-library(tictoc)
+#### I'M SO CONFUSED BY THIS BUFFERING....
+
+xbuff <- st_buffer(seedtraps[91,], 10)
+
+ggplot() +
+  geom_spatraster(data = renv) +
+  # geom_spatvector(data = terra::vect(buff), alpha = 0.5) +
+  geom_point(data = seedtraps, aes(x, y), colour = "black") +
+  geom_sf(data = xbuff) +
+  scale_fill_viridis_c()
+
+
 
 sum_within_dist_rast <- function(x, y, dist, func = sum) {
 
@@ -110,65 +141,87 @@ sum_within_dist_rast <- function(x, y, dist, func = sum) {
   donuts <- doughnut_builder(buff)
   toc()
 
-  # plot(st_geometry(donuts))
-  # plot(st_geometry(donuts)[1,], add = TRUE, col = "red")
-  # plot(st_geometry(donuts)[3,], add = TRUE, col = "red")
-  # plot(st_geometry(donuts)[101,], add = TRUE, col = "blue")
-  # plot(st_geometry(donuts)[201,], add = TRUE, col = "green")
-  # plot(st_geometry(donuts)[299,], add = TRUE, col = "green")
-  # plot(st_geometry(donuts)[300,], add = TRUE, col = "green")
+  plot(st_geometry(donuts))
+  plot(st_geometry(donuts)[1,], add = TRUE, col = "red")
+  plot(st_geometry(donuts)[3,], add = TRUE, col = "red")
+  plot(st_geometry(donuts)[101,], add = TRUE, col = "blue")
+  plot(st_geometry(donuts)[201,], add = TRUE, col = "green")
+  plot(st_geometry(donuts)[299,], add = TRUE, col = "green")
+  plot(st_geometry(donuts)[300,], add = TRUE, col = "green")
 
-  tic("calculate area")
-  # calculate cell area covered
-  area <- terra::cellSize(y, unit = "m")
-  toc()
+  # # tic("calculate area")
+  # # # calculate cell area covered
+  # # area <- terra::cellSize(y, unit = "m")
+  # # toc()
+  #
+  # # combine environmental and cell area
+  # comb <- c(y, area)
+  # names(comb) <- c(names(y), "cellArea")
 
-  # combine environmental and cell area
-  comb <- c(y, area)
-  names(comb) <- c(names(y), "cellArea")
 
 
-  # tic("extract")
-  # # get values
-  # #this handles edges i.e.won't count cells that aren't there
-  # val <- terra::extract(comb, donuts,
-  #                       cells = TRUE,
-  #                       xy = TRUE,
-  #                       touches = TRUE, # all cells that are touched by buffer, not just centroid
-  #                       exact = TRUE)
-  # toc()
+  if(is.null(func)) {
+    tic("extract raw")
+    # get values
+    #this handles edges i.e.won't count cells that aren't there
+    val <- exactextractr::exact_extract(x = y,
+                                        y = donuts,
+                                        fun = NULL,
+                                        include_xy = TRUE,
+                                        include_area = TRUE,
+                                        include_cols = c("ID"),
+                                        include_cell = FALSE)
+    toc()
 
-  tic("exact extract")
-  # get values
-  #this handles edges i.e.won't count cells that aren't there
-  val <- exactextractr::exact_extract(x = comb,
-                                      y = donuts,
-                                      fun = "sum",
-                                      include_xy = FALSE,
-                                      include_area = TRUE,
-                                      # include_cols = c("ID"),
-                                      include_cell = FALSE,
-                                      force_df = FALSE)#,
-  # touches = TRUE, # all cells that are touched by buffer, not just centroid
-  # exact = TRUE)
-  toc()
-
-  if(inherits(val, "list"))
     val <- do.call(rbind, val)
+    head(val)
+
+    tic("calculate area")
+    # calculate the area of the cell that is covered by the ppolygons
+    val$amount_cell_in <- val$cellArea*val$coverage_fraction
+
+    summed_val <- as.numeric(tapply(val[,names(y)], val$ID, func))
+    area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
+    # sumperarea <- summed_val / area
+    # mean_val <- as.numeric(tapply(val[,names(y)], val$ID, mean))
+    toc()
+
+    list(value = val$value, area = val$area*val$coverage_fraction)
+
+  } else if(inherits(func, "character") | inherits(func, "function")){
+
+    area <- terra::cellSize(y, unit = "m")
+
+    tic("extract summary")
+    # get values
+    #this handles edges i.e.won't count cells that aren't there
+    val <- exactextractr::exact_extract(x = y,
+                                        y = donuts,
+                                        fun = c("coefficient_of_variation"),
+                                        force_df = FALSE)
+    head(val)
+    toc()
+
+    tic("extract area of polys")
+    # get values
+    #this handles edges i.e.won't count cells that aren't there
+    areaval <- exactextractr::exact_extract(x = area,
+                                            y = donuts,
+                                            fun = "sum",
+                                            force_df = FALSE)
+    head(areaval)
+    toc()
+
+    list(value = val, area = areaval)
+
+  } else stop("'func' must be of class 'character' or 'function' which takes a vector and outputs a single summary statistic.
+         For a full list of available functions see '?exactextractr::exact_extract'.")
+
+  head(val)
+
   val
-
-  tic("calculate area")
-  # calculate the area of the cell that is covered by the ppolygons
-  val$amount_cell_in <- val$area*val$coverage_fraction
-
-  summed_val <- as.numeric(tapply(val[,names(y)], val$ID, func))
-  area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
-  # sumperarea <- summed_val / area
-  # mean_val <- as.numeric(tapply(val[,names(y)], val$ID, mean))
-  toc()
-
-  # commenting out to be consistent with sum_within_dist
-  list(summed_val = summed_val, area = area)#, sumperarea = sumperarea)
+  #commenting out to be consistent with sum_within_dist
+  #, sumperarea = sumperarea)
 
 }
 
