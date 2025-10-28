@@ -50,27 +50,84 @@ ggplot() +
   scale_fill_viridis_c()
 
 
-##### This is a function that creates donuts
+# ##### This is a function that creates donuts
+# doughnut_builder <- function(poly_list) {
+#   # Ensure input is a list of sfc or sfg objects
+#   stopifnot(is.list(poly_list))
+#   n <- length(poly_list)
+#
+#   if (n < 2) stop("Need at least two polygons.")
+#
+#   # Apply st_difference sequentially
+#   diffs <- map2(poly_list[-1], poly_list[-n], st_difference)
+#
+#   # Return as an sfc geometry collection
+#   diffs <- do.call(rbind, diffs)
+#
+#   #remove second coordinates
+#   diffs[, grep(".1", colnames(diffs))] <- NULL
+#
+#   # add ID column
+#   diffs$ID <- 1:nrow(diffs)
+#
+#   diffs
+# }
+
+
+# doughnut_builder <- function(polys) {
+#   # # Handle sf or sfc objects by converting to list of geometries
+#   # if (inherits(polys, "sf")) {
+#   #   poly_list <- st_geometry(polys)
+#   # } else if (inherits(polys, "sfc")) {
+#   #   poly_list <- polys
+#   # } else if (is.list(polys)) {
+#   #   poly_list <- st_sfc(polys)
+#   # } else {
+#   #   stop("Input must be a list of polygons, sfc, or sf object.")
+#   # }
+#
+#   n <- length(poly_list)
+#   if (n < 2) stop("Need at least two polygons.")
+#
+#   # For each k ≥ 2, compute poly_k - union(poly_1:(k-1))
+#   results <- map(2:n, function(k) {
+#     st_difference(poly_list[[k]], st_union(poly_list[1:(k - 1)]))
+#   })
+#
+#   # Return tidy sf object
+#   st_sf(
+#     ID = paste0("donut_", 2:n),
+#     geometry = st_sfc(results)
+#   )
+# }
+
 doughnut_builder <- function(poly_list) {
-  # Ensure input is a list of sfc or sfg objects
-  stopifnot(is.list(poly_list))
+  # Validate input
+  stopifnot(is.list(poly_list), all(map_lgl(poly_list, ~ inherits(.x, "sf"))))
   n <- length(poly_list)
+  if (n < 2) stop("Need at least two sf data frames.")
+  # First layer
+  results <- list(poly_list[[1]])
 
-  if (n < 2) stop("Need at least two polygons.")
+  the_doughnuts <- map2(poly_list[-1], 2:n, function(current_sf, k) {
+    # Combine all previous layers' geometries into a single sfc
+    prev_geoms <- do.call(c, map(poly_list[1:(k - 1)], st_geometry))
+    prev_union <- st_union(st_sfc(prev_geoms, crs = st_crs(current_sf)))
 
-  # Apply st_difference sequentially
-  diffs <- map2( poly_list[-1], poly_list[-n], st_difference)
+    # Subtract union of previous layers from each polygon in current layer
+    geom_diff <- st_difference(st_geometry(current_sf), prev_union)
 
-  # Return as an sfc geometry collection
-  diffs <- do.call(rbind, diffs)
+    # Return sf with same attributes, plus layer ID
+    current_sf %>%
+      mutate(geometry = geom_diff)
+  })
+  results <- c(results, the_doughnuts)
 
-  #remove second coordinates
-  diffs[, grep(".1", colnames(diffs))] <- NULL
-  diffs
+  # Combine all results
+  results <- do.call(rbind, results)
+  results$ID <- 1:nrow(results)
+  results
 }
-
-
-
 
 
 # Function to extract data within an area
@@ -78,50 +135,88 @@ doughnut_builder <- function(poly_list) {
 ## testing
 x = seedtraps
 y = renv
-dist = c(10, 20)
+dist = c(10, 20, 30)
 func = sum
+
+library(tictoc)
 
 sum_within_dist_rast <- function(x, y, dist, func = sum) {
 
-  # buffer point
-  buff <- terra::vect(sf::st_buffer(x, dist))
+  # tic("buffer")
+  # # buffer point
+  # buff <- terra::vect(sf::st_buffer(x, dist))
+  # toc()
 
+  tic("buffer")
   buff <- lapply(dist, sf::st_buffer, x = x)
+  toc()
 
   # ggplot() +
   #   geom_tile(data = y, aes(x, y, fill = lyr.1)) +
   #   geom_sf(data = buff[[3]], alpha = 1) +
   #   scale_fill_viridis_c()
 
+  tic("create doughnuts")
+  ##### DOES THIS NEED A PLOT TO CHECK THAT IT'S CREATED THE DOUGHNUTS PROPERLY?!?!?! PROBABLY!!
   donuts <- doughnut_builder(buff)
-  buff_donuts <- rbind(buff[[1]], donuts)
+  toc()
 
-  # plot(st_geometry(buff_donuts[5,]), col = c("black"))
-  # plot(st_geometry(buff_donuts[4,]), col = c("yellow"), add = TRUE)
-  # plot(st_geometry(buff_donuts[3,]), col = c("green", "yellow", "black"), add = TRUE)
-  # plot(st_geometry(buff_donuts[2,]), col = c("blue", "green", "yellow", "black"), add = TRUE)
-  # plot(st_geometry(buff_donuts[1,]), col = c("red", "blue", "green", "yellow", "black"), add = TRUE)
+  # plot(st_geometry(donuts))
+  # plot(st_geometry(donuts)[1,], add = TRUE, col = "red")
+  # plot(st_geometry(donuts)[3,], add = TRUE, col = "red")
+  # plot(st_geometry(donuts)[101,], add = TRUE, col = "blue")
+  # plot(st_geometry(donuts)[201,], add = TRUE, col = "green")
+  # plot(st_geometry(donuts)[299,], add = TRUE, col = "green")
+  # plot(st_geometry(donuts)[300,], add = TRUE, col = "green")
 
+  tic("calculate area")
   # calculate cell area covered
   area <- terra::cellSize(y, unit = "m")
+  toc()
 
   # combine environmental and cell area
   comb <- c(y, area)
+  names(comb) <- c(names(y), "cellArea")
 
+
+  # tic("extract")
+  # # get values
+  # #this handles edges i.e.won't count cells that aren't there
+  # val <- terra::extract(comb, donuts,
+  #                       cells = TRUE,
+  #                       xy = TRUE,
+  #                       touches = TRUE, # all cells that are touched by buffer, not just centroid
+  #                       exact = TRUE)
+  # toc()
+
+  tic("exact extract")
   # get values
   #this handles edges i.e.won't count cells that aren't there
-  system.time(val <- terra::extract(comb, buff_donuts,
-                                    xy = TRUE,
-                                    touches = TRUE, # all cells that are touched by buffer, not just centroid
-                                    exact = TRUE))
+  val <- exactextractr::exact_extract(x = comb,
+                                      y = donuts,
+                                      fun = "sum",
+                                      include_xy = FALSE,
+                                      include_area = TRUE,
+                                      # include_cols = c("ID"),
+                                      include_cell = FALSE,
+                                      force_df = FALSE)#,
+  # touches = TRUE, # all cells that are touched by buffer, not just centroid
+  # exact = TRUE)
+  toc()
 
+  if(inherits(val, "list"))
+    val <- do.call(rbind, val)
+  val
+
+  tic("calculate area")
   # calculate the area of the cell that is covered by the ppolygons
-  val$amount_cell_in <- val$area*val$fraction
+  val$amount_cell_in <- val$area*val$coverage_fraction
 
   summed_val <- as.numeric(tapply(val[,names(y)], val$ID, func))
   area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
   # sumperarea <- summed_val / area
   # mean_val <- as.numeric(tapply(val[,names(y)], val$ID, mean))
+  toc()
 
   # commenting out to be consistent with sum_within_dist
   list(summed_val = summed_val, area = area)#, sumperarea = sumperarea)
