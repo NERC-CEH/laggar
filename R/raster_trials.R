@@ -97,7 +97,7 @@ ggplot() +
 
 
 # function to do a calculation based on areas within doughnuts
-sum_within_dist_rast <- function(x, y, dist, func = NULL) {
+values_within_dist_rast <- function(x, y, dist, func = NULL) {
 
   tic("buffer")
   buff <- lapply(dist, sf::st_buffer, x = x)
@@ -130,14 +130,11 @@ sum_within_dist_rast <- function(x, y, dist, func = NULL) {
     toc()
 
     val <- do.call(rbind, val)
-    # head(val)
 
     tic("calculate area")
     # calculate the area of the cell that is covered by the ppolygons
     val$amount_cell_in <- val$cellArea*val$coverage_fraction
 
-    # summed_val <- as.numeric(tapply(val[,names(y)], val$ID, func))
-    # area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
     toc()
 
     return(list(value = val$value, area = val$area*val$coverage_fraction))
@@ -190,8 +187,11 @@ bound_poly = NULL
 
 lg_rast <- function(x, y, dist_seq = NULL, func = "sum", bound_poly = NULL, mindist = NULL,
                     maxdist = NULL, incdist = NULL) {
+
+  # convert x to sf
   x <- .sf_conversion(x, "x")
 
+  # what tests are needed for y ?!?!?!
   if(!inherits(y, "SpatRaster"))
     stop("y must be of class 'SpatRaster'")
 
@@ -210,25 +210,16 @@ lg_rast <- function(x, y, dist_seq = NULL, func = "sum", bound_poly = NULL, mind
 
   dist <- .index_check(minindex = mindist, maxindex = maxdist,
                        incindex = incdist, index_seq = dist_seq)
-  # sumdist <- lapply(dist, sum_within_dist_rast, x = x, y = y, func = func)#, bound_poly = bound_poly)
 
-  sumdist <- sum_within_dist_rast(x=x, y=y, func=func, dist = dist_seq)
+  # calculate values within distance
+  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist = dist_seq)
 
-  # num_points <- sapply(sumdist, "[[", 1)
-  # num_points <- t(apply(num_points, 1, function(x) diff(c(0,
-  #                                                         x))))
-  # if (!is.null(bound_poly)) {
-  #   buffer_area <- sapply(sumdist, "[[", 2)
-  #   buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,
-  #                                                             x))))
-  #   points_parea <- num_points/buffer_area
-  # }
-  # else {
-  #   buffer_area <- NA
-  #   points_parea <- NA
-  # }
-  return(list(num_points = num_points, buffer_area = buffer_area,
-              points_parea = points_parea))
+  # calculate value per area
+  value_parea <-sumdist$value/sumdist$area
+
+
+  return(list(buffer_values = sumdist$value, buffer_area = sumdist$area,
+              value_parea = value_parea))
 
 }
 
