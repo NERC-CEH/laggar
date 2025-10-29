@@ -10,17 +10,13 @@ library(mgcv)
 library(purrr)
 library(tictoc)
 
-## choose projection, BNG or latlong
-bng = FALSE
 
-## simulate data --- metres
+## simulate spatial data
 set.seed(100230)
-# if(bng){
 boundary <- st_polygon(list(matrix(c(0,1000,1000,0,0,
                                      0,0,1000,1000,0),ncol=2)))
 
 adults <- st_sample(boundary, size = 300)
-
 
 seedtraps <- data.frame(
   x = rep(seq(50,950,100), 10),
@@ -32,31 +28,11 @@ seedtraps <- data.frame(
 r <- rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:32630")
 
 
-# } else {
-#   ## simulate data --- latlong
-#   set.seed(100230)
-#   boundary <- st_polygon(list(matrix(c(0,100,100,0,0,
-#                                        0,0,100,100,0),ncol=2)))
-#
-#   adults <- st_sample(boundary, size = 300)
-#
-#   seedtraps <- data.frame(
-#     x = rep(seq(5,95,10), 10),
-#     y = rep(seq(5,95,10), each = 10)
-#   ) |>
-#     st_as_sf(coords = c("x","y"), remove = FALSE,
-#              crs = "EPSG:32630")
-#
-#   r <- rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:32630")
-#
-# }
-
 ### simulate data ---------------------------------------
 # create empty raster
 
 # simulate rainfall data
 renv <- simulate_data(x = r, n = 1, scale = 0.8, intensity = 22, sd = 1)
-# plot(renv)
 # ---------------------------
 
 ## plot
@@ -65,6 +41,7 @@ ggplot() +
   # geom_spatvector(data = terra::vect(buff), alpha = 0.5) +
   geom_point(data = seedtraps, aes(x, y), colour = "black") +
   scale_fill_viridis_c()
+
 
 # function to create doughnuts
 doughnut_builder <- function(poly_list) {
@@ -102,71 +79,50 @@ doughnut_builder <- function(poly_list) {
 x = seedtraps
 y = renv
 # if(bng){
-dist = c(10, 20, 30) #} else {
+dist = c(10, 20, 30)
+
+#} else {
 #   dist = c(10000, 20000, 30000)
 # }
 func = "sum"
 
-#### I'M SO CONFUSED BY THIS BUFFERING....
 
 xbuff <- st_buffer(seedtraps[91,], 10)
 
 ggplot() +
   geom_spatraster(data = renv) +
-  # geom_spatvector(data = terra::vect(buff), alpha = 0.5) +
   geom_point(data = seedtraps, aes(x, y), colour = "black") +
   geom_sf(data = xbuff) +
   scale_fill_viridis_c()
 
 
-
-sum_within_dist_rast <- function(x, y, dist, func = sum) {
-
-  # tic("buffer")
-  # # buffer point
-  # buff <- terra::vect(sf::st_buffer(x, dist))
-  # toc()
+# function to do a calculation based on areas within doughnuts
+sum_within_dist_rast <- function(x, y, dist, func = NULL) {
 
   tic("buffer")
   buff <- lapply(dist, sf::st_buffer, x = x)
   toc()
 
-  # ggplot() +
-  #   geom_tile(data = y, aes(x, y, fill = lyr.1)) +
-  #   geom_sf(data = buff[[3]], alpha = 1) +
-  #   scale_fill_viridis_c()
-
   tic("create doughnuts")
   ##### DOES THIS NEED A PLOT TO CHECK THAT IT'S CREATED THE DOUGHNUTS PROPERLY?!?!?! PROBABLY!!
-  donuts <- doughnut_builder(buff)
+  doughnuts <- doughnut_builder(buff)
   toc()
 
-  plot(st_geometry(donuts))
-  plot(st_geometry(donuts)[1,], add = TRUE, col = "red")
-  plot(st_geometry(donuts)[3,], add = TRUE, col = "red")
-  plot(st_geometry(donuts)[101,], add = TRUE, col = "blue")
-  plot(st_geometry(donuts)[201,], add = TRUE, col = "green")
-  plot(st_geometry(donuts)[299,], add = TRUE, col = "green")
-  plot(st_geometry(donuts)[300,], add = TRUE, col = "green")
-
-  # # tic("calculate area")
-  # # # calculate cell area covered
-  # # area <- terra::cellSize(y, unit = "m")
-  # # toc()
-  #
-  # # combine environmental and cell area
-  # comb <- c(y, area)
-  # names(comb) <- c(names(y), "cellArea")
-
-
+  # plot(st_geometry(donuts))
+  # plot(st_geometry(donuts)[1,], add = TRUE, col = "red")
+  # plot(st_geometry(donuts)[3,], add = TRUE, col = "red")
+  # plot(st_geometry(donuts)[101,], add = TRUE, col = "blue")
+  # plot(st_geometry(donuts)[201,], add = TRUE, col = "green")
+  # plot(st_geometry(donuts)[299,], add = TRUE, col = "green")
+  # plot(st_geometry(donuts)[300,], add = TRUE, col = "green")
 
   if(is.null(func)) {
     tic("extract raw")
     # get values
     #this handles edges i.e.won't count cells that aren't there
     val <- exactextractr::exact_extract(x = y,
-                                        y = donuts,
-                                        fun = NULL,
+                                        y = doughnuts,
+                                        fun = func,
                                         include_xy = TRUE,
                                         include_area = TRUE,
                                         include_cols = c("ID"),
@@ -174,106 +130,46 @@ sum_within_dist_rast <- function(x, y, dist, func = sum) {
     toc()
 
     val <- do.call(rbind, val)
-    head(val)
+    # head(val)
 
     tic("calculate area")
     # calculate the area of the cell that is covered by the ppolygons
     val$amount_cell_in <- val$cellArea*val$coverage_fraction
 
-    summed_val <- as.numeric(tapply(val[,names(y)], val$ID, func))
-    area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
-    # sumperarea <- summed_val / area
-    # mean_val <- as.numeric(tapply(val[,names(y)], val$ID, mean))
+    # summed_val <- as.numeric(tapply(val[,names(y)], val$ID, func))
+    # area <- as.numeric(tapply(val$amount_cell_in, val$ID, sum))
     toc()
 
-    list(value = val$value, area = val$area*val$coverage_fraction)
+    return(list(value = val$value, area = val$area*val$coverage_fraction))
 
   } else if(inherits(func, "character") | inherits(func, "function")){
-
-    area <- terra::cellSize(y, unit = "m")
 
     tic("extract summary")
     # get values
     #this handles edges i.e.won't count cells that aren't there
     val <- exactextractr::exact_extract(x = y,
                                         y = donuts,
-                                        fun = c("coefficient_of_variation"),
+                                        fun = func,
                                         force_df = FALSE)
     head(val)
     toc()
 
     tic("extract area of polys")
-    # get values
+    # Calculate area of the doughnuts
+    area <- terra::cellSize(y, unit = "m")
     #this handles edges i.e.won't count cells that aren't there
     areaval <- exactextractr::exact_extract(x = area,
                                             y = donuts,
-                                            fun = func,
+                                            fun = "sum",
                                             force_df = FALSE)
-    head(areaval)
     toc()
 
-    list(value = val, area = areaval)
+    return(list(value = val, area = areaval))
 
   } else stop("'func' must be of class 'character' or 'function' which takes a vector and outputs a single summary statistic.
          For a full list of available functions see '?exactextractr::exact_extract'.")
 
-  #commenting out to be consistent with sum_within_dist
-  #, sumperarea = sumperarea)
-
 }
-
-library(sf)
-library(purrr)
-
-
-
-# polys <- list(buff)
-#
-# # Sequential difference
-# donuts <- sequential_difference(buff)
-#
-# plot(st_geometry(donuts), col = c("lightblue", "lightgreen"), border = "black")
-
-
-############### Original POINTS code uses lg_points
-############### I think changing sum_within_dist function is enough
-# lg_points <-
-# function (x, y, dist_seq = NULL, bound_poly = NULL, mindist = NULL,
-#     maxdist = NULL, incdist = NULL)
-# {
-#     x <- .sf_conversion(x, "x")
-#     y <- .sf_conversion(y, "y")
-#     if (!all(sf::st_geometry_type(x) == "POINT"))
-#         stop("x must be a sf object including only POINT geometries")
-#     if (!all(sf::st_geometry_type(y) == "POINT"))
-#         stop("y must be a sf object including only POINT geometries")
-#     if (!is.null(bound_poly)) {
-#         bound_poly <- .sf_conversion(bound_poly, "bound_poly")
-#         if (length(bound_poly) != 1 | length(sf::st_geometry_type(bound_poly)) !=
-#             1)
-#             stop("bound_poly must be a sf object comprising a single polygon")
-#         if (sf::st_geometry_type(bound_poly) != "POLYGON")
-#             stop("bound_poly must be a sf object comprising a single polygon")
-#     }
-#     dist <- .index_check(minindex = mindist, maxindex = maxdist,
-#         incindex = incdist, index_seq = dist_seq)
-#     sumdist <- lapply(dist, sum_within_dist, x = x, y = y, bound_poly = bound_poly)
-#     num_points <- sapply(sumdist, "[[", 1)
-#     num_points <- t(apply(num_points, 1, function(x) diff(c(0,
-#         x))))
-#     if (!is.null(bound_poly)) {
-#         buffer_area <- sapply(sumdist, "[[", 2)
-#         buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,
-#             x))))
-#         points_parea <- num_points/buffer_area
-#     }
-#     else {
-#         buffer_area <- NA
-#         points_parea <- NA
-#     }
-#     return(list(num_points = num_points, buffer_area = buffer_area,
-#         points_parea = points_parea))
-# }
 
 
 .sf_conversion <- function(object, name = "object"){
@@ -295,19 +191,22 @@ bound_poly = NULL
 lg_rast <- function(x, y, dist_seq = NULL, func = "sum", bound_poly = NULL, mindist = NULL,
                     maxdist = NULL, incdist = NULL) {
   x <- .sf_conversion(x, "x")
-  y <- .sf_conversion(y, "y")
-  if (!all(sf::st_geometry_type(x) == "POINT"))
-    stop("x must be a sf object including only POINT geometries")
-  if (!all(sf::st_geometry_type(y) == "POINT"))
-    stop("y must be a sf object including only POINT geometries")
-  if (!is.null(bound_poly)) {
-    bound_poly <- .sf_conversion(bound_poly, "bound_poly")
-    if (length(bound_poly) != 1 | length(sf::st_geometry_type(bound_poly)) !=
-        1)
-      stop("bound_poly must be a sf object comprising a single polygon")
-    if (sf::st_geometry_type(bound_poly) != "POLYGON")
-      stop("bound_poly must be a sf object comprising a single polygon")
-  }
+
+  if(!inherits(y, "SpatRaster"))
+    stop("y must be of class 'SpatRaster'")
+
+  # if (!all(sf::st_geometry_type(x) == "POINT"))
+  #   stop("x must be a sf object including only POINT geometries")
+  # if (!all(sf::st_geometry_type(y) == "POINT"))
+  #   stop("y must be a sf object including only POINT geometries")
+  # if (!is.null(bound_poly)) {
+  #   bound_poly <- .sf_conversion(bound_poly, "bound_poly")
+  #   if (length(bound_poly) != 1 | length(sf::st_geometry_type(bound_poly)) !=
+  #       1)
+  #     stop("bound_poly must be a sf object comprising a single polygon")
+  #   if (sf::st_geometry_type(bound_poly) != "POLYGON")
+  #     stop("bound_poly must be a sf object comprising a single polygon")
+  # }
 
   dist <- .index_check(minindex = mindist, maxindex = maxdist,
                        incindex = incdist, index_seq = dist_seq)
