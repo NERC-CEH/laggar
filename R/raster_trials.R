@@ -42,6 +42,8 @@ ggplot() +
   geom_point(data = seedtraps, aes(x, y), colour = "black") +
   scale_fill_viridis_c()
 
+# # testing
+# poly_list = buff
 
 # function to create doughnuts
 doughnut_builder <- function(poly_list) {
@@ -52,10 +54,10 @@ doughnut_builder <- function(poly_list) {
   # First layer
 
   tic("get differences")
-  the_doughnuts <- lapply(1:length(poly_list), function(x) {
+  the_doughnuts <- lapply(1:length(poly_list), function(i) {
 
     if(i==1){
-      return(poly_list)
+      return(poly_list[[1]])
     } else {
       prev_geoms <- do.call(rbind, poly_list[1:(i - 1)])
       return(st_difference(poly_list[[i]], prev_geoms))
@@ -64,6 +66,11 @@ doughnut_builder <- function(poly_list) {
   })
   toc()
 
+  # remove extra cols
+  for(i in 1:length(the_doughnuts)) {
+    the_doughnuts[[i]][,grep(".1", colnames(the_doughnuts[[i]]), value = FALSE)] <- NULL
+  }
+
   results <-  do.call(rbind, the_doughnuts)
   results$ID <- 1:nrow(results)
   results
@@ -71,23 +78,6 @@ doughnut_builder <- function(poly_list) {
 
 
 
-# results <- doughnut_builder(poly_list)
-#
-# ## write code to check doughnut builder
-# length(poly_list)
-# nrow(results)
-#
-#
-# # check a single object
-# nentries <-  unique(sapply(poly_list, nrow))
-#
-# c(1, 101, 201)
-# 1+100
-#
-#
-# rep(1, length(poly_list))
-#
-#
 # ### testing
 # doughnut_out = doughnuts
 # nbuffers = length(dist)
@@ -131,7 +121,6 @@ x = seedtraps
 y = renv
 dist = c(10, 20, 30, 60, 80, 90, 200)#, 60, 80, 100)
 object_n = 1
-poly_list = buff
 plot_doughnuts = TRUE
 func = "sum"
 
@@ -159,7 +148,6 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
 
   if(plot_doughnuts){
     check_doughnuts(doughnuts, nbuffers = length(dist), object_n = object_n)
-
   }
 
   if(is.null(func)) {
