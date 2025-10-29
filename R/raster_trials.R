@@ -50,9 +50,45 @@ doughnut_builder <- function(poly_list) {
   n <- length(poly_list)
   if (n < 2) stop("Need at least two sf data frames.")
   # First layer
-  results <- list(poly_list[[1]])
+  # results <- list(poly_list[[1]])
 
-  the_doughnuts <- map2(poly_list[-1], 2:n, function(current_sf, k) {
+  tic("apply")
+  diffs <- lapply(1:length(poly_list), function(x) {
+
+    if(i==1){
+      return(poly_list)
+    } else {
+      prev_geoms <- do.call(rbind, poly_list[1:(i - 1)])
+      return(st_difference(poly_list[[i]], prev_geoms))
+    }
+
+  })
+  toc()
+
+  tic("loop")
+  diff_outs <- list(poly_list[[1]])
+
+  for(i in 2:length(poly_list)) {
+    print(i)
+    prev_geoms <- do.call(c, map(poly_list[1:(i - 1)], st_geometry))
+    diff_outs[[i]] <- st_difference(poly_list[[i]], prev_geoms)
+
+  }
+  toc()
+
+  tic()
+  lapply(1:length(poly_list), function(x) {
+    if(i==1){
+      return(poly_list)
+    } else {
+      prev_geoms <- do.call(rbind, poly_list[1:(x - 1)])
+      geom_diff <- st_difference(poly_list[[x]], prev_geoms)
+      geom_diff
+    }})
+toc()
+
+
+  the_doughnuts <- map2(poly_list[-1], 2:length(poly_list), function(current_sf, k) {
     # Combine all previous layers' geometries into a single sfc
     prev_geoms <- do.call(c, map(poly_list[1:(k - 1)], st_geometry))
     prev_union <- st_union(st_sfc(prev_geoms, crs = st_crs(current_sf)))
@@ -63,6 +99,17 @@ doughnut_builder <- function(poly_list) {
     # Return sf with same attributes, plus layer ID
     current_sf %>%
       mutate(geometry = geom_diff)
+
+    # # Element-wise st_difference to ensure one geometry per row
+    # geom_diff <- purrr::map(
+    #   sf::st_geometry(current_sf),
+    #   ~ sf::st_difference(sf::st_set_crs(sf::st_sfc(.x), sf::st_crs(current_sf)),
+    #                       prev_union)
+    # ) |> sf::st_sfc(crs = sf::st_crs(current_sf))
+    #
+    # # Return sf with updated geometry
+    # current_sf$geometry <- geom_diff
+    # current_sf
   })
   results <- c(results, the_doughnuts)
 
@@ -73,104 +120,58 @@ doughnut_builder <- function(poly_list) {
 }
 
 
-results <- doughnut_builder(poly_list)
 
-## write code to check doughnut builder
-length(poly_list)
-nrow(results)
-
-
-# check a single object
-nentries <-  unique(sapply(poly_list, nrow))
-
-c(1, 101, 201)
-1+100
-
-
-rep(1, length(poly_list))
-
-
-### testing
-doughnut_out = doughnuts
-nbuffers = length(dist)
-object_n = 1
+# results <- doughnut_builder(poly_list)
+#
+# ## write code to check doughnut builder
+# length(poly_list)
+# nrow(results)
+#
+#
+# # check a single object
+# nentries <-  unique(sapply(poly_list, nrow))
+#
+# c(1, 101, 201)
+# 1+100
+#
+#
+# rep(1, length(poly_list))
+#
+#
+# ### testing
+# doughnut_out = doughnuts
+# nbuffers = length(dist)
+# object_n = 30
 
 # function to plot single object across all buffer sizes
 check_doughnuts <- function(doughnut_out, nbuffers, object_n = 1) {
-if(nbuffers>9)
-  stop("Maximum number of buffers for plotting is 9.")
+  if(nbuffers>9)
+    stop("Maximum number of buffers for plotting is 9.")
 
   # get the index
-  index_for_plotting <- (object_n:nbuffers-1) *
+  index_for_plotting <- (0:(nbuffers-1)) *
     (dim(doughnut_out)[1]/nbuffers) + object_n
 
   # create colour palette
   col_palette <- palette.colors(n = nbuffers)
 
-  par(mfrow = c(1, nbuffers))
+
+  # base plot plotting solution
+  par(mfrow = c(1, nbuffers+1),
+      mai = c(1, 0, 1, 0))
+  plot(st_geometry(doughnut_out),
+       col = rep(col_palette, each = dim(doughnut_out)[1]/nbuffers),
+       main = "All buffered regions")
   lapply(1:length(index_for_plotting), function(x)
-    print(plot(st_geometry(doughnut_out[index_for_plotting[x],]),
-               xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
-               ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)],
-               col = col_palette[x])))
+    (plot(st_geometry(doughnut_out[index_for_plotting[x],]),
+          xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
+          ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)],
+          col = col_palette[x],
+          main = paste("Buffered region", x))))
   par(mfrow = c(1, 1))
 
-}
-
-## with a list (i.e. results from inside doughnut_builder)
-# function to plot single object across all buffer sizes
-check_doughnuts <- function(doughnut_out, nbuffers, object_n = 1) {
-
-  # get the index
-  index_for_plotting <- c(0, (2:length(poly_list)) *
-                            (dim(results)[1]/length(poly_list))) + object_n
-
-  lapply(index_for_plotting, function(x)
-    print(plot(st_geometry(results[x,]),
-               xlim = st_bbox(results[max(index_for_plotting),])[c(1, 3)],
-               ylim = st_bbox(results[max(index_for_plotting),])[c(2, 4)],
-               col = "red")))
 
 }
-
-# get position of first object
-index_for_plotting <- c(0, (2:length(poly_list)) * (dim(results)[1]/length(poly_list))) + 1
-
-
-plot_object_n = 3
-
-
-1:3+nentries
-sappply(1:length(poly_list), function(x) )
-
-
-index_for_plotting <- c(1, 1+nentries, 201)
-
-par(mfrow = c(1, length(poly_list)))
-lapply(index_for_plotting, function(x)
-  print(plot(st_geometry(results[x,]),
-             xlim = st_bbox(results[max(index_for_plotting),])[c(1, 3)],
-             ylim = st_bbox(results[max(index_for_plotting),])[c(2, 4)],
-             col = "red")))
-par(mfrow = c(1,1))
-
-plot(st_geometry(results[c(1, 101, 201),]))
-plot(st_geometry(results[101:103,]))
-
-length(poly_list)
-
-str(poly_list)## check results
-
-
-# plot(st_geometry(donuts))
-# plot(st_geometry(donuts)[1,], add = TRUE, col = "red")
-# plot(st_geometry(donuts)[3,], add = TRUE, col = "red")
-# plot(st_geometry(donuts)[101,], add = TRUE, col = "blue")
-# plot(st_geometry(donuts)[201,], add = TRUE, col = "green")
-# plot(st_geometry(donuts)[299,], add = TRUE, col = "green")
-# plot(st_geometry(donuts)[300,], add = TRUE, col = "green")
-
-
 
 
 # Function to extract data within an area
@@ -179,7 +180,44 @@ str(poly_list)## check results
 x = seedtraps
 y = renv
 # if(bng){
-dist = c(10, 20, 30)
+dist = c(10, 20, 30, 60, 80, 90, 200)#, 60, 80, 100)
+
+poly_list = buff
+
+
+
+
+
+doughnut_builder <- function(poly_list) {
+  stopifnot(is.list(poly_list), all(purrr::map_lgl(poly_list, ~ inherits(.x, "sf"))))
+  n <- length(poly_list)
+  if (n < 2) stop("Need at least two sf data frames.")
+
+  # Ensure all layers use the same CRS
+  crs_ref <- sf::st_crs(poly_list[[1]])
+  poly_list <- purrr::map(poly_list, ~ sf::st_transform(.x, crs_ref))
+
+  results <- list(poly_list[[1]])
+
+  the_doughnuts <- purrr::map2(poly_list[-1], 2:n, function(current_sf, k) {
+    prev_geoms <- do.call(c, purrr::map(poly_list[1:(k - 1)], sf::st_geometry))
+    prev_union <- sf::st_union(prev_geoms)
+    sf::st_crs(prev_union) <- sf::st_crs(current_sf)  # 🔹 enforce CRS
+
+    geom_diff <- purrr::map(
+      sf::st_geometry(current_sf),
+      ~ sf::st_difference(.x, prev_union)
+    ) |> sf::st_sfc(crs = crs_ref)
+
+    current_sf$geometry <- geom_diff
+    current_sf
+  })
+
+  results <- c(results, the_doughnuts)
+  results <- do.call(rbind, results)
+  results$ID <- seq_len(nrow(results))
+  results
+}
 
 #} else {
 #   dist = c(10000, 20000, 30000)
@@ -197,7 +235,8 @@ ggplot() +
 
 
 # function to do a calculation based on areas within doughnuts
-values_within_dist_rast <- function(x, y, dist, func = NULL, plot_doughnuts = TRUE) {
+values_within_dist_rast <- function(x, y, dist, func = NULL,
+                                    plot_doughnuts = TRUE, object_n = 30) {
 
   tic("buffer")
   buff <- lapply(dist, sf::st_buffer, x = x)
@@ -208,7 +247,7 @@ values_within_dist_rast <- function(x, y, dist, func = NULL, plot_doughnuts = TR
   toc()
 
   if(plot_doughnuts){
-
+    check_doughnuts(doughnuts, nbuffers = length(dist), object_n = object_n)
 
   }
 
