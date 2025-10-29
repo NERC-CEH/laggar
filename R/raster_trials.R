@@ -73,6 +73,79 @@ doughnut_builder <- function(poly_list) {
 }
 
 
+results <- doughnut_builder(poly_list)
+
+## write code to check doughnut builder
+length(poly_list)
+nrow(results)
+
+
+# check a single object
+nentries <-  unique(sapply(poly_list, nrow))
+
+c(1, 101, 201)
+1+100
+
+
+rep(1, length(poly_list))
+
+
+
+# function to check single object
+check_doughnuts <- function(doughnut_out, nobjects, object_n = 1) {
+
+  # get the index
+  index_for_plotting <- c(0, (2:length(poly_list)) *
+                            (dim(results)[1]/length(poly_list))) + object_n
+
+  lapply(index_for_plotting, function(x)
+    print(plot(st_geometry(results[x,]),
+               xlim = st_bbox(results[max(index_for_plotting),])[c(1, 3)],
+               ylim = st_bbox(results[max(index_for_plotting),])[c(2, 4)],
+               col = "red")))
+
+}
+
+# get position of first object
+index_for_plotting <- c(0, (2:length(poly_list)) * (dim(results)[1]/length(poly_list))) + 1
+
+
+plot_object_n = 3
+
+
+1:3+nentries
+sappply(1:length(poly_list), function(x) )
+
+
+index_for_plotting <- c(1, 1+nentries, 201)
+
+par(mfrow = c(1, length(poly_list)))
+lapply(index_for_plotting, function(x)
+  print(plot(st_geometry(results[x,]),
+             xlim = st_bbox(results[max(index_for_plotting),])[c(1, 3)],
+             ylim = st_bbox(results[max(index_for_plotting),])[c(2, 4)],
+             col = "red")))
+par(mfrow = c(1,1))
+
+plot(st_geometry(results[c(1, 101, 201),]))
+plot(st_geometry(results[101:103,]))
+
+length(poly_list)
+
+str(poly_list)## check results
+
+
+# plot(st_geometry(donuts))
+# plot(st_geometry(donuts)[1,], add = TRUE, col = "red")
+# plot(st_geometry(donuts)[3,], add = TRUE, col = "red")
+# plot(st_geometry(donuts)[101,], add = TRUE, col = "blue")
+# plot(st_geometry(donuts)[201,], add = TRUE, col = "green")
+# plot(st_geometry(donuts)[299,], add = TRUE, col = "green")
+# plot(st_geometry(donuts)[300,], add = TRUE, col = "green")
+
+
+
+
 # Function to extract data within an area
 # this works with a custom function
 ## testing
@@ -97,24 +170,20 @@ ggplot() +
 
 
 # function to do a calculation based on areas within doughnuts
-values_within_dist_rast <- function(x, y, dist, func = NULL) {
+values_within_dist_rast <- function(x, y, dist, func = NULL, plot_doughnuts = TRUE) {
 
   tic("buffer")
   buff <- lapply(dist, sf::st_buffer, x = x)
   toc()
 
   tic("create doughnuts")
-  ##### DOES THIS NEED A PLOT TO CHECK THAT IT'S CREATED THE DOUGHNUTS PROPERLY?!?!?! PROBABLY!!
   doughnuts <- doughnut_builder(buff)
   toc()
 
-  # plot(st_geometry(donuts))
-  # plot(st_geometry(donuts)[1,], add = TRUE, col = "red")
-  # plot(st_geometry(donuts)[3,], add = TRUE, col = "red")
-  # plot(st_geometry(donuts)[101,], add = TRUE, col = "blue")
-  # plot(st_geometry(donuts)[201,], add = TRUE, col = "green")
-  # plot(st_geometry(donuts)[299,], add = TRUE, col = "green")
-  # plot(st_geometry(donuts)[300,], add = TRUE, col = "green")
+  if(plot_doughnuts){
+
+
+  }
 
   if(is.null(func)) {
     tic("extract raw")
@@ -145,10 +214,11 @@ values_within_dist_rast <- function(x, y, dist, func = NULL) {
     # get values
     #this handles edges i.e.won't count cells that aren't there
     val <- exactextractr::exact_extract(x = y,
-                                        y = donuts,
+                                        y = doughnuts,
                                         fun = func,
                                         force_df = FALSE)
-    head(val)
+    #convert to matrix
+    val <- matrix(val, nrow = nrow(x))
     toc()
 
     tic("extract area of polys")
@@ -156,9 +226,10 @@ values_within_dist_rast <- function(x, y, dist, func = NULL) {
     area <- terra::cellSize(y, unit = "m")
     #this handles edges i.e.won't count cells that aren't there
     areaval <- exactextractr::exact_extract(x = area,
-                                            y = donuts,
+                                            y = doughnuts,
                                             fun = "sum",
                                             force_df = FALSE)
+    areaval <- matrix(areaval, nrow = nrow(x))
     toc()
 
     return(list(value = val, area = areaval))
@@ -177,15 +248,16 @@ values_within_dist_rast <- function(x, y, dist, func = NULL) {
   return(object)
 }
 
-x = seedtraps
-y = renv
-dist_seq = c(20, 40)
-mindist = NULL
-maxdist = NULL
-incdist = NULL
-bound_poly = NULL
+# x = seedtraps
+# y = renv
+# dist_seq = c(20, 40)
+# mindist = NULL
+# maxdist = NULL
+# incdist = NULL
+# bound_poly = NULL
 
-lg_rast <- function(x, y, dist_seq = NULL, func = "sum", bound_poly = NULL, mindist = NULL,
+# function to
+lg_rast <- function(x, y, dist_seq = NULL, func = NULL, bound_poly = NULL, mindist = NULL,
                     maxdist = NULL, incdist = NULL) {
 
   # convert x to sf
@@ -212,7 +284,7 @@ lg_rast <- function(x, y, dist_seq = NULL, func = "sum", bound_poly = NULL, mind
                        incindex = incdist, index_seq = dist_seq)
 
   # calculate values within distance
-  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist = dist_seq)
+  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist = dist)
 
   # calculate value per area
   value_parea <-sumdist$value/sumdist$area
