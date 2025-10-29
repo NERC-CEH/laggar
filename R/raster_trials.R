@@ -207,7 +207,7 @@ sum_within_dist_rast <- function(x, y, dist, func = sum) {
     #this handles edges i.e.won't count cells that aren't there
     areaval <- exactextractr::exact_extract(x = area,
                                             y = donuts,
-                                            fun = "sum",
+                                            fun = func,
                                             force_df = FALSE)
     head(areaval)
     toc()
@@ -217,9 +217,6 @@ sum_within_dist_rast <- function(x, y, dist, func = sum) {
   } else stop("'func' must be of class 'character' or 'function' which takes a vector and outputs a single summary statistic.
          For a full list of available functions see '?exactextractr::exact_extract'.")
 
-  head(val)
-
-  val
   #commenting out to be consistent with sum_within_dist
   #, sumperarea = sumperarea)
 
@@ -314,23 +311,23 @@ lg_rast <- function(x, y, dist_seq = NULL, func = "sum", bound_poly = NULL, mind
 
   dist <- .index_check(minindex = mindist, maxindex = maxdist,
                        incindex = incdist, index_seq = dist_seq)
-  sumdist <- lapply(dist, sum_within_dist_rast, x = x, y = y, func = func)#, bound_poly = bound_poly)
+  # sumdist <- lapply(dist, sum_within_dist_rast, x = x, y = y, func = func)#, bound_poly = bound_poly)
 
-  sum_within_dist_rast(x=x, y=y, func=func, dist = dist_seq)
+  sumdist <- sum_within_dist_rast(x=x, y=y, func=func, dist = dist_seq)
 
-  num_points <- sapply(sumdist, "[[", 1)
-  num_points <- t(apply(num_points, 1, function(x) diff(c(0,
-                                                          x))))
-  if (!is.null(bound_poly)) {
-    buffer_area <- sapply(sumdist, "[[", 2)
-    buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,
-                                                              x))))
-    points_parea <- num_points/buffer_area
-  }
-  else {
-    buffer_area <- NA
-    points_parea <- NA
-  }
+  # num_points <- sapply(sumdist, "[[", 1)
+  # num_points <- t(apply(num_points, 1, function(x) diff(c(0,
+  #                                                         x))))
+  # if (!is.null(bound_poly)) {
+  #   buffer_area <- sapply(sumdist, "[[", 2)
+  #   buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,
+  #                                                             x))))
+  #   points_parea <- num_points/buffer_area
+  # }
+  # else {
+  #   buffer_area <- NA
+  #   points_parea <- NA
+  # }
   return(list(num_points = num_points, buffer_area = buffer_area,
               points_parea = points_parea))
 
