@@ -50,10 +50,9 @@ doughnut_builder <- function(poly_list) {
   n <- length(poly_list)
   if (n < 2) stop("Need at least two sf data frames.")
   # First layer
-  # results <- list(poly_list[[1]])
 
-  tic("apply")
-  diffs <- lapply(1:length(poly_list), function(x) {
+  tic("get differences")
+  the_doughnuts <- lapply(1:length(poly_list), function(x) {
 
     if(i==1){
       return(poly_list)
@@ -65,56 +64,7 @@ doughnut_builder <- function(poly_list) {
   })
   toc()
 
-  tic("loop")
-  diff_outs <- list(poly_list[[1]])
-
-  for(i in 2:length(poly_list)) {
-    print(i)
-    prev_geoms <- do.call(c, map(poly_list[1:(i - 1)], st_geometry))
-    diff_outs[[i]] <- st_difference(poly_list[[i]], prev_geoms)
-
-  }
-  toc()
-
-  tic()
-  lapply(1:length(poly_list), function(x) {
-    if(i==1){
-      return(poly_list)
-    } else {
-      prev_geoms <- do.call(rbind, poly_list[1:(x - 1)])
-      geom_diff <- st_difference(poly_list[[x]], prev_geoms)
-      geom_diff
-    }})
-toc()
-
-
-  the_doughnuts <- map2(poly_list[-1], 2:length(poly_list), function(current_sf, k) {
-    # Combine all previous layers' geometries into a single sfc
-    prev_geoms <- do.call(c, map(poly_list[1:(k - 1)], st_geometry))
-    prev_union <- st_union(st_sfc(prev_geoms, crs = st_crs(current_sf)))
-
-    # Subtract union of previous layers from each polygon in current layer
-    geom_diff <- st_difference(st_geometry(current_sf), prev_union)
-
-    # Return sf with same attributes, plus layer ID
-    current_sf %>%
-      mutate(geometry = geom_diff)
-
-    # # Element-wise st_difference to ensure one geometry per row
-    # geom_diff <- purrr::map(
-    #   sf::st_geometry(current_sf),
-    #   ~ sf::st_difference(sf::st_set_crs(sf::st_sfc(.x), sf::st_crs(current_sf)),
-    #                       prev_union)
-    # ) |> sf::st_sfc(crs = sf::st_crs(current_sf))
-    #
-    # # Return sf with updated geometry
-    # current_sf$geometry <- geom_diff
-    # current_sf
-  })
-  results <- c(results, the_doughnuts)
-
-  # Combine all results
-  results <- do.call(rbind, results)
+  results <-  do.call(rbind, the_doughnuts)
   results$ID <- 1:nrow(results)
   results
 }
@@ -179,49 +129,10 @@ check_doughnuts <- function(doughnut_out, nbuffers, object_n = 1) {
 ## testing
 x = seedtraps
 y = renv
-# if(bng){
 dist = c(10, 20, 30, 60, 80, 90, 200)#, 60, 80, 100)
-
+object_n = 1
 poly_list = buff
-
-
-
-
-
-doughnut_builder <- function(poly_list) {
-  stopifnot(is.list(poly_list), all(purrr::map_lgl(poly_list, ~ inherits(.x, "sf"))))
-  n <- length(poly_list)
-  if (n < 2) stop("Need at least two sf data frames.")
-
-  # Ensure all layers use the same CRS
-  crs_ref <- sf::st_crs(poly_list[[1]])
-  poly_list <- purrr::map(poly_list, ~ sf::st_transform(.x, crs_ref))
-
-  results <- list(poly_list[[1]])
-
-  the_doughnuts <- purrr::map2(poly_list[-1], 2:n, function(current_sf, k) {
-    prev_geoms <- do.call(c, purrr::map(poly_list[1:(k - 1)], sf::st_geometry))
-    prev_union <- sf::st_union(prev_geoms)
-    sf::st_crs(prev_union) <- sf::st_crs(current_sf)  # 🔹 enforce CRS
-
-    geom_diff <- purrr::map(
-      sf::st_geometry(current_sf),
-      ~ sf::st_difference(.x, prev_union)
-    ) |> sf::st_sfc(crs = crs_ref)
-
-    current_sf$geometry <- geom_diff
-    current_sf
-  })
-
-  results <- c(results, the_doughnuts)
-  results <- do.call(rbind, results)
-  results$ID <- seq_len(nrow(results))
-  results
-}
-
-#} else {
-#   dist = c(10000, 20000, 30000)
-# }
+plot_doughnuts = TRUE
 func = "sum"
 
 
