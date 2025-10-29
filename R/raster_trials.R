@@ -90,9 +90,36 @@ c(1, 101, 201)
 rep(1, length(poly_list))
 
 
+### testing
+doughnut_out = doughnuts
+nbuffers = length(dist)
+object_n = 1
 
-# function to check single object
-check_doughnuts <- function(doughnut_out, nobjects, object_n = 1) {
+# function to plot single object across all buffer sizes
+check_doughnuts <- function(doughnut_out, nbuffers, object_n = 1) {
+if(nbuffers>9)
+  stop("Maximum number of buffers for plotting is 9.")
+
+  # get the index
+  index_for_plotting <- (object_n:nbuffers-1) *
+    (dim(doughnut_out)[1]/nbuffers) + object_n
+
+  # create colour palette
+  col_palette <- palette.colors(n = nbuffers)
+
+  par(mfrow = c(1, nbuffers))
+  lapply(1:length(index_for_plotting), function(x)
+    print(plot(st_geometry(doughnut_out[index_for_plotting[x],]),
+               xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
+               ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)],
+               col = col_palette[x])))
+  par(mfrow = c(1, 1))
+
+}
+
+## with a list (i.e. results from inside doughnut_builder)
+# function to plot single object across all buffer sizes
+check_doughnuts <- function(doughnut_out, nbuffers, object_n = 1) {
 
   # get the index
   index_for_plotting <- c(0, (2:length(poly_list)) *
