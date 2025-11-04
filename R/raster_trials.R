@@ -52,7 +52,7 @@ ggplot() +
 ## testing
 x = seedtraps
 y = renv
-dist = c(10, 20, 30, 60, 80, 100)
+dist = c(10,20,30)
 object_n = 1
 plot_doughnuts = TRUE
 func = "sum"
@@ -71,6 +71,8 @@ ggplot() +
 values_within_dist_rast <- function(x, y, dist, func = NULL,
                                     plot_doughnuts = TRUE, object_n = 30) {
 
+  if(any(duplicated(dist))) stop("Cannot have duplicates in 'dist' parameter")
+
   tic("buffer")
   buff <- lapply(dist, sf::st_buffer, x = x)
   toc()
@@ -80,6 +82,8 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
   toc()
 
   if(plot_doughnuts){
+    ### ADD THE POSSIBILITY TO PLOT IT WITH THE ENVIRONMENTAL BACKGROUND
+    ### CODE IN GGPLOT
     doughnut_checker(doughnuts, nbuffers = length(dist), object_n = object_n,
                      nobjects = unique(sapply(buff, nrow)))
   }
@@ -238,8 +242,8 @@ doughnut_builder <- function(poly_list) {
   # }))
   # toc()
 
-  # code with help from copilot
-  tic("chat code")
+  # # code with help from copilot
+  # tic("chat code")
 
   # Assuming each object has n buffers stacked in order
 
@@ -289,11 +293,11 @@ doughnut_builder <- function(poly_list) {
 }
 
 
-### testing
-doughnut_out = doughnuts
-nbuffers = length(dist)
-nobjects = unique(sapply(buff, nrow))
-object_n = 30
+# ### testing
+# doughnut_out = doughnuts
+# nbuffers = length(dist)
+# nobjects = unique(sapply(buff, nrow))
+# object_n = 30
 
 # function to plot single object across all buffer sizes
 doughnut_checker <- function(doughnut_out, # output of doughnut_builder
