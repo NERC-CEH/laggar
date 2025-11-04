@@ -45,73 +45,6 @@ ggplot() +
 # # testing
 # poly_list = buff
 
-# function to create doughnuts
-doughnut_builder <- function(poly_list) {
-  # Validate input
-  stopifnot(is.list(poly_list), all(map_lgl(poly_list, ~ inherits(.x, "sf"))))
-  n <- length(poly_list)
-  if (n < 2) stop("Need at least two sf data frames.")
-  # First layer
-
-  tic("get differences")
-  the_doughnuts <- lapply(1:length(poly_list), function(i) {
-
-    if(i==1){
-      return(poly_list[[1]])
-    } else {
-      prev_geoms <- do.call(rbind, poly_list[1:(i - 1)])
-      return(st_difference(poly_list[[i]], prev_geoms))
-    }
-
-  })
-  toc()
-
-  # remove extra cols
-  for(i in 1:length(the_doughnuts)) {
-    the_doughnuts[[i]][,grep(".1", colnames(the_doughnuts[[i]]), value = FALSE)] <- NULL
-  }
-
-  results <-  do.call(rbind, the_doughnuts)
-  results$ID <- 1:nrow(results)
-  results
-}
-
-
-
-# ### testing
-# doughnut_out = doughnuts
-# nbuffers = length(dist)
-# object_n = 30
-
-# function to plot single object across all buffer sizes
-check_doughnuts <- function(doughnut_out, nbuffers, object_n = 1) {
-  if(nbuffers>9)
-    stop("Maximum number of buffers for plotting is 9.")
-
-  # get the index
-  index_for_plotting <- (0:(nbuffers-1)) *
-    (dim(doughnut_out)[1]/nbuffers) + object_n
-
-  # create colour palette
-  col_palette <- palette.colors(n = nbuffers)
-
-
-  # base plot plotting solution
-  par(mfrow = c(1, nbuffers+1),
-      mai = c(1, 0, 1, 0))
-  plot(st_geometry(doughnut_out),
-       col = rep(col_palette, each = dim(doughnut_out)[1]/nbuffers),
-       main = "All buffered regions")
-  lapply(1:length(index_for_plotting), function(x)
-    (plot(st_geometry(doughnut_out[index_for_plotting[x],]),
-          xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
-          ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)],
-          col = col_palette[x],
-          main = paste("Buffered region", x))))
-  par(mfrow = c(1, 1))
-
-
-}
 
 
 # Function to extract data within an area
@@ -119,7 +52,7 @@ check_doughnuts <- function(doughnut_out, nbuffers, object_n = 1) {
 ## testing
 x = seedtraps
 y = renv
-dist = c(10, 20, 30, 60, 80, 90, 200)#, 60, 80, 100)
+dist = c(10, 20, 30, 60, 80, 100)
 object_n = 1
 plot_doughnuts = TRUE
 func = "sum"
@@ -143,11 +76,12 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
   toc()
 
   tic("create doughnuts")
-  doughnuts <- doughnut_builder(buff)
+  doughnuts <- doughnut_builder(poly_list = buff)
   toc()
 
   if(plot_doughnuts){
-    check_doughnuts(doughnuts, nbuffers = length(dist), object_n = object_n)
+    doughnut_checker(doughnuts, nbuffers = length(dist), object_n = object_n,
+                     nobjects = unique(sapply(buff, nrow)))
   }
 
   if(is.null(func)) {
@@ -199,7 +133,8 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
 
     return(list(value = val, area = areaval))
 
-  } else stop("'func' must be of class 'character' or 'function' which takes a vector and outputs a single summary statistic.
+  } else stop("'func' must be of class 'character' or 'function' which takes a vector
+  and outputs a single summary statistic.
          For a full list of available functions see '?exactextractr::exact_extract'.")
 
 }
@@ -222,13 +157,18 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
 # bound_poly = NULL
 
 # function to
-lg_rast <- function(x, y, dist_seq = NULL, func = NULL, bound_poly = NULL, mindist = NULL,
-                    maxdist = NULL, incdist = NULL) {
+lg_rast <- function(x,
+                    y,
+                    func = NULL, # function to summarise the data within each of the buffers (as specified in exactextractr::exact_extract. If NULL it returns raw values for each cell within the buffer
+                    #bound_poly = NULL, -- no need for bound poly because the area is limited by the raster
+                    dist_seq = NULL, mindist = NULL, maxdist = NULL, incdist = NULL, # buffer specification
+                    plot_doughnuts = TRUE # plot the doughnuts for error checking - highly recommended!!
+) {
 
   # convert x to sf
   x <- .sf_conversion(x, "x")
 
-  # what tests are needed for y ?!?!?!
+  # what tests are needed for x and y ?!?!?!
   if(!inherits(y, "SpatRaster"))
     stop("y must be of class 'SpatRaster'")
 
@@ -249,7 +189,8 @@ lg_rast <- function(x, y, dist_seq = NULL, func = NULL, bound_poly = NULL, mindi
                        incindex = incdist, index_seq = dist_seq)
 
   # calculate values within distance
-  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist = dist)
+  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist = dist,
+                                     plot_doughnuts = plot_doughnuts)
 
   # calculate value per area
   value_parea <-sumdist$value/sumdist$area
@@ -265,159 +206,141 @@ lg_rast <- function(x, y, dist_seq = NULL, func = NULL, bound_poly = NULL, mindi
 
 
 
+# function to create doughnuts
+doughnut_builder <- function(poly_list) {
+  # Validate input
+  stopifnot(is.list(poly_list), all(map_lgl(poly_list, ~ inherits(.x, "sf"))))
+  n <- length(poly_list)
+  if (n < 2) stop("Need at least two sf data frames.")
+
+  tic("get differences")
+
+  nrows <- unique(sapply(poly_list, nrow))
+  if(length(nrows)>1) stop("Number of rows within each item in poly_list must be the same")
+
+  # combine the list into a single object to work on
+  comb_list <- do.call(rbind, poly_list)
+
+  # identify each buffered object as determined by number of polygons supplied
+  # need to get the buffered objects of object 1:n objects in poly_list
+  object_indices <- lapply(1:nrows, function(x) x + (0:(length(poly_list)-1) * nrows))
+
+  # tic("my code")
+  # # get differences between each polygon
+  # the_doughnuts <- do.call(rbind, lapply(object_indices, function(x) {
+  #   single_object <- comb_list[x, ]
+  #   rbind(single_object[1,], do.call(rbind, lapply(1:nrow(single_object), function(i) {
+  #
+  #     prev_geoms <- st_union(single_object[1:(i - 1),])
+  #     st_difference(single_object[i,], prev_geoms)
+  #   }))
+  #   )
+  # }))
+  # toc()
+
+  # code with help from copilot
+  tic("chat code")
+
+  # Assuming each object has n buffers stacked in order
+
+  the_doughnuts <- do.call(rbind, map(object_indices, function(idx) {
+    single_object <- comb_list[idx, ]
+
+    # Extract geometries only
+    geoms <- st_geometry(single_object)
+
+    # Compute doughnuts: outer buffer minus inner buffer
+    diffs <- map2(
+      geoms[-1],  # outer buffers
+      geoms[-length(geoms)],  # inner buffers
+      st_difference,
+      by_feature = TRUE
+    )
+
+    geom_col <- do.call(c, lapply(diffs, st_sfc, crs = st_crs(geoms)))
 
 
+    st_geometry(single_object) <- c(geoms[1,], geom_col)
+    single_object
+
+  }))
+
+  toc()
 
 
+  # # })
+  #
+  # # remove extra cols
+  # for(i in 1:length(the_doughnuts)) {
+  #   the_doughnuts[[i]][,grep(".1", colnames(the_doughnuts[[i]]), value = FALSE)] <- NULL
+  # }
 
+  results <- the_doughnuts[ order(as.numeric(row.names(the_doughnuts))), ] # do.call(rbind, the_doughnuts)
 
+  # # what is going on with this geometry????
+  # plot(st_geometry(results[301,]))
+  # plot(st_geometry(results[301:400,]), col = "red")
+  # plot(st_geometry(results[201:300,]), col = "blue", add = TRUE)
+  # plot(st_geometry(results[101:200,]), col = "yellow", add = TRUE)
+  # plot(st_geometry(results[1:100,]), col = "green", add = TRUE)
 
-
-
-
-
-
-
-
-
-
-
-dist <- laggar:::.index_check(minindex = NULL, maxindex = NULL,
-                              incindex = NULL, index_seq = NULL)
-
-
-sum_within_dist(x = seedtraps, y = adults, poly = poly, dist = 20)
-
-
-dist_seq <- c(20)
-
-### this works but takes a while with big buffer areas because of extract function presumably
-sumdist <- sum_within_dist_rast(x = seedtraps,
-                                y = renv,
-                                dist = 100)
-
-## sum the number of points within dist of each seedtrap
-sumdist <- lapply(dist_seq, sum_within_dist, x = x, y = y, poly = poly)
-
-## no idea what this does
-num_points <- sapply(sumdist, "[[", 1) # extracts the first item in each sublist, i.e. npoints
-num_points <- t(apply(num_points, 1, function(x) diff(c(0,
-                                                        x))))
-
-
-if (!is.null(poly)) {
-  buffer_area <- sapply(sumdist, "[[", 2)
-  buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,
-                                                            x))))
-  points_parea <- num_points/buffer_area
-} else {
-  buffer_area <- NA
-  points_parea <- NA
+  results$ID <- 1:nrow(results)
+  results
 }
-return(list(num_points = num_points, buffer_area = buffer_area,
-            points_parea = points_parea))
 
 
-tst
+### testing
+doughnut_out = doughnuts
+nbuffers = length(dist)
+nobjects = unique(sapply(buff, nrow))
+object_n = 30
 
-points_perha <- 1e4*tst$sumperarea
-
-lgr <- lg_assembly(response = nseeds,
-                   covariate = points_perha,
-                   index_seq = dist_seq)
-
-
-dist_seq <- seq(10,200,10)
-
-## sum the number of points within dist of each seedtrap
-system.time(
-  sumdist <- lapply(dist_seq, sum_within_dist_rast, x = seedtraps, y = renv)
-)
-
-## no idea what this does
-num_points <- sapply(sumdist, "[[", 1) # extracts the first item in each sublist, i.e. npoints
-# convert from cumulative sum
-num_points <- t(apply(num_points, 1, function(x) diff(c(0,
-                                                        x))))
-
-buffer_area <- sapply(sumdist, "[[", 2)
-buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0,x))))
-points_parea <- num_points/buffer_area
+# function to plot single object across all buffer sizes
+doughnut_checker <- function(doughnut_out, # output of doughnut_builder
+                             nbuffers, # number of buffers implemented
+                             nobjects, # number of objects that were originally buffered
+                             object_n = 1) # the number of object that you want to check (i.e. which buffered point do you want plotted)
+{
+  if(nbuffers>9)
+    stop("Maximum number of buffers for plotting is 9.")
+  if(object_n > nobjects)
+    stop("The object chosen for plotting must be in range 0:nobjects")
 
 
+  # create an index for plotting
+  index_for_plotting <-
+    (0:(nbuffers-1) * nobjects) + object_n
+  message("plotting object indices ", paste(index_for_plotting, collapse = ", "))
+
+  # # get the index
+  # index_for_plotting <- (0:(nbuffers-1)) *
+  #   (dim(doughnut_out)[1]/nbuffers) + object_n
+
+  # create colour palette
+  col_palette <- palette.colors(n = nbuffers)
 
 
-### for a sequence
-dist_seq <- seq(10,200,10)
+  # base plot plotting solution
+  plot(st_geometry(doughnut_out),
+       col = rep(col_palette, each = dim(doughnut_out)[1]/nbuffers),
+       main = "All buffered regions")
 
-x = seedtraps
-y = renv
-dist = 20#seq(2,10, by = 2)
-
-
-sumdist <- sum_within_dist_rast(x = seedtraps,
-                                y = renv,
-                                dist = 20)
-glimpse(sumdist)
-
-
-# buffer point
-buff <- terra::vect(sf::st_buffer(x, dist))
-
-# get values
-val <- terra::extract(y, buff, xy = TRUE,
-                      exact = TRUE )
-
-# sum the values
-lapply(1:length(unique(val$ID)), function(x) {
-  list(summed_value = sum(val$lyr.1[val$ID == unique(val$ID)[x]]),
-       area =  sum(val$fraction[val$ID == unique(val$ID)[x]]))
-})
-
-# list(npoints = sum_y_in_buff, area = area_in_buff)
+  par(mfrow = c(1, nbuffers))
+  lapply(1:length(index_for_plotting), function(x)
+    (plot(st_geometry(doughnut_out[index_for_plotting[x],]),
+          xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
+          ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)],
+          col = col_palette[x],
+          main = paste("Buffered region", x))))
+  par(mfrow = c(1, 1))
 
 
-## sum the number of points within dist of each seedtrap
-sumdist <- lapply(dist_seq, sum_within_dist_rast, x = seedtraps, y = renv)
-
-
-
-
-
-x <- rasterize(buff, renv, fun="sum")
-
-# get intersection
-r <- terra::relate(x = terra::vect(buff),
-                   y = renv,
-                   "intersects")
-r
-
-
-
-
-
-
-y_in_buff <- sf::st_contains(buff, y)
-sum_y_in_buff <- sapply(y_in_buff, length)
-if(!is.null(poly)){
-  suppressWarnings(area_in_buff <- sf::st_area(sf::st_intersection(buff, poly)))
-} else{
-  area_in_buff <- rep(NA, length(sum_y_in_buff))
 }
-list(npoints = sum_y_in_buff, area = area_in_buff)
 
 
 
-sum_within_dist <- function(x, y, poly, dist){
-  buff <- sf::st_buffer(x, dist)
-  y_in_buff <- sf::st_contains(buff, y)
-  sum_y_in_buff <- sapply(y_in_buff, length)
-  if(!is.null(poly)){
-    suppressWarnings(area_in_buff <- sf::st_area(sf::st_intersection(buff, poly)))
-  } else{
-    area_in_buff <- rep(NA, length(sum_y_in_buff))
-  }
-  list(npoints = sum_y_in_buff, area = area_in_buff)
-}
+
+
+
 
 
