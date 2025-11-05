@@ -2,26 +2,31 @@
 # function to create doughnuts that takes a list of sf dataframes
 # could add ability to take dataframe...?
 doughnut_builder <- function(poly_list) {
+
   # Validate input
-  stopifnot(is.list(poly_list), all(map_lgl(poly_list, ~ inherits(.x, "sf"))))
+  stopifnot(
+    is.list(poly_list),
+    all(map_lgl(poly_list, ~ inherits(.x, "sf"))))
+
   n <- length(poly_list)
   if (n < 2) stop("Need at least two sf data frames.")
 
   nrows <- unique(sapply(poly_list, nrow))
   if(length(nrows)>1) stop("Number of rows within each item in poly_list must be the same")
 
-  # combine the list into a single object to work on
-  comb_list <- do.call(rbind, poly_list)
 
-  # identify each buffered object as determined by number of polygons supplied
-  # need to get the buffered objects of object 1:n objects in poly_list
-  object_indices <- lapply(1:nrows, function(x) x + (0:(length(poly_list)-1) * nrows))
+  # Combine all sf objects into one
+  combined <- do.call(rbind, poly_list)
 
-  # calculate the differe3nces
+  # Indexing for each feature across buffer levels
+  object_indices <- lapply(1:nrows,
+                           function(x) x + (0:(length(poly_list)-1) * nrows))
+
+  # calculate the differences - create doughnuts
   the_doughnuts <- do.call(rbind, map(object_indices, function(idx) {
-    single_object <- comb_list[idx, ]
+    single_object <- combined[idx, ]
 
-    # Extract geometries only
+    # extract geometries only
     geoms <- st_geometry(single_object)
 
     # Compute doughnuts: outer buffer minus inner buffer
@@ -32,16 +37,19 @@ doughnut_builder <- function(poly_list) {
       by_feature = TRUE
     )
 
+    # give the differences the same crs and combine
     geom_col <- do.call(c, lapply(diffs, st_sfc, crs = st_crs(geoms)))
 
-
+    # add the initial object
     st_geometry(single_object) <- c(geoms[1,], geom_col)
     single_object
 
   }))
-  results <- the_doughnuts[ order(as.numeric(row.names(the_doughnuts))), ] # do.call(rbind, the_doughnuts)
+
+  # Combine results and assign IDs
+  results <- the_doughnuts[order(as.numeric(row.names(the_doughnuts))), ]
   results$ID <- 1:nrow(results)
-  results
+  return(results)
 }
 
 
