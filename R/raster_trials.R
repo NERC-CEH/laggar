@@ -297,12 +297,12 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
     if(terra::nlyr(rast_bg_layer) > 1)
       warning("'rast_bg_layer' has more than one layer, using first layer for plotting")
     rast_bg_layer <- as.data.frame(rast_bg_layer,xy = TRUE)
-    names(rast_bg_layer) <- c("x", "y", "lyr")
+    names(rast_bg_layer) <- c("x", "y", "val")
   }
 
   # plot all buffers in one plot
   ggplot() +
-    {if(!is.null(rast_bg_layer)) geom_tile(data = rast_bg_layer, aes(x, y, fill = lyr))} +
+    {if(!is.null(rast_bg_layer)) geom_tile(data = rast_bg_layer, aes(x, y, fill = val))} +
     scale_fill_viridis_c(option = "D", name = NULL) +
     ggnewscale::new_scale_fill() +
     geom_sf(data = doughnut_out, aes(fill =  buffer_name), alpha = 0.7) +
@@ -312,7 +312,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
   ## plot specific layer
   plts <- lapply(1:length(index_for_plotting), function(x)
     ggplot() +
-      {if(!is.null(rast_bg_layer)) geom_tile(data = rast_bg_layer, aes(x, y, fill = lyr))} +
+      {if(!is.null(rast_bg_layer)) geom_tile(data = rast_bg_layer, aes(x, y, fill = val))} +
       scale_fill_viridis_c(option = "D", name = NULL) +
       ggnewscale::new_scale_fill() +
       geom_sf(data = doughnut_out[index_for_plotting[x],],
