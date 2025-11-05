@@ -69,7 +69,7 @@ ggplot() +
 
 # function to do a calculation based on areas within doughnuts
 values_within_dist_rast <- function(x, y, dist, func = NULL,
-                                    plot_doughnuts = TRUE, object_n = 30) {
+                                    plot_doughnuts = TRUE, object_n = 1) {
 
   if(any(duplicated(dist))) stop("Cannot have duplicates in 'dist' parameter")
 
@@ -210,14 +210,13 @@ lg_rast <- function(x,
 
 
 
-# function to create doughnuts
+# function to create doughnuts that takes a list of sf dataframes
+# could add ability to take dataframe...?
 doughnut_builder <- function(poly_list) {
   # Validate input
   stopifnot(is.list(poly_list), all(map_lgl(poly_list, ~ inherits(.x, "sf"))))
   n <- length(poly_list)
   if (n < 2) stop("Need at least two sf data frames.")
-
-  tic("get differences")
 
   nrows <- unique(sapply(poly_list, nrow))
   if(length(nrows)>1) stop("Number of rows within each item in poly_list must be the same")
@@ -229,24 +228,7 @@ doughnut_builder <- function(poly_list) {
   # need to get the buffered objects of object 1:n objects in poly_list
   object_indices <- lapply(1:nrows, function(x) x + (0:(length(poly_list)-1) * nrows))
 
-  # tic("my code")
-  # # get differences between each polygon
-  # the_doughnuts <- do.call(rbind, lapply(object_indices, function(x) {
-  #   single_object <- comb_list[x, ]
-  #   rbind(single_object[1,], do.call(rbind, lapply(1:nrow(single_object), function(i) {
-  #
-  #     prev_geoms <- st_union(single_object[1:(i - 1),])
-  #     st_difference(single_object[i,], prev_geoms)
-  #   }))
-  #   )
-  # }))
-  # toc()
-
-  # # code with help from copilot
-  # tic("chat code")
-
-  # Assuming each object has n buffers stacked in order
-
+  # calculate the differe3nces
   the_doughnuts <- do.call(rbind, map(object_indices, function(idx) {
     single_object <- comb_list[idx, ]
 
@@ -269,41 +251,26 @@ doughnut_builder <- function(poly_list) {
 
   }))
 
-  toc()
-
-
-  # # })
-  #
-  # # remove extra cols
-  # for(i in 1:length(the_doughnuts)) {
-  #   the_doughnuts[[i]][,grep(".1", colnames(the_doughnuts[[i]]), value = FALSE)] <- NULL
-  # }
 
   results <- the_doughnuts[ order(as.numeric(row.names(the_doughnuts))), ] # do.call(rbind, the_doughnuts)
 
-  # # what is going on with this geometry????
-  # plot(st_geometry(results[301,]))
-  # plot(st_geometry(results[301:400,]), col = "red")
-  # plot(st_geometry(results[201:300,]), col = "blue", add = TRUE)
-  # plot(st_geometry(results[101:200,]), col = "yellow", add = TRUE)
-  # plot(st_geometry(results[1:100,]), col = "green", add = TRUE)
 
   results$ID <- 1:nrow(results)
   results
 }
 
 
-# ### testing
-# doughnut_out = doughnuts
-# nbuffers = length(dist)
-# nobjects = unique(sapply(buff, nrow))
-# object_n = 30
+### testing
+doughnut_out = doughnuts
+nbuffers = length(dist)
+nobjects = unique(sapply(buff, nrow))
+object_n = 30
 
 # function to plot single object across all buffer sizes
 doughnut_checker <- function(doughnut_out, # output of doughnut_builder
                              nbuffers, # number of buffers implemented
                              nobjects, # number of objects that were originally buffered
-                             object_n = 1) # the number of object that you want to check (i.e. which buffered point do you want plotted)
+                             object_n = 1) # the number of object that you want to check (i.e. which buffered point do you want plotted). Can be NULL if want to skip single object check, not recommended.
 {
   if(nbuffers>9)
     stop("Maximum number of buffers for plotting is 9.")
@@ -316,10 +283,6 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
     (0:(nbuffers-1) * nobjects) + object_n
   message("plotting object indices ", paste(index_for_plotting, collapse = ", "))
 
-  # # get the index
-  # index_for_plotting <- (0:(nbuffers-1)) *
-  #   (dim(doughnut_out)[1]/nbuffers) + object_n
-
   # create colour palette
   col_palette <- palette.colors(n = nbuffers)
 
@@ -329,15 +292,16 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
        col = rep(col_palette, each = dim(doughnut_out)[1]/nbuffers),
        main = "All buffered regions")
 
-  par(mfrow = c(1, nbuffers))
-  lapply(1:length(index_for_plotting), function(x)
-    (plot(st_geometry(doughnut_out[index_for_plotting[x],]),
-          xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
-          ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)],
-          col = col_palette[x],
-          main = paste("Buffered region", x))))
-  par(mfrow = c(1, 1))
-
+  if(!is.null(object_n)){
+    par(mfrow = c(1, nbuffers))
+    lapply(1:length(index_for_plotting), function(x)
+      (plot(st_geometry(doughnut_out[index_for_plotting[x],]),
+            xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
+            ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)],
+            col = col_palette[x],
+            main = paste("Buffered region", x))))
+    par(mfrow = c(1, 1))
+  }
 
 }
 
