@@ -1,6 +1,20 @@
 
-# function to create doughnuts that takes a list of sf dataframes
-# could add ability to take dataframe...?
+
+#' Build Doughnut Geometries from a List of sf Data Frames
+#'
+#' This function takes a list of `sf` data frames representing progressively buffered geometries
+#' and returns a new `sf` object where each row contains a doughnut-shaped geometry
+#' (i.e., the difference between successive buffers). This
+#'
+#' @param poly_list A list of `sf` data frames. Each data frame must have the same number of rows,
+#'   and represent a different buffer level of the same set of geometries.
+#'
+#' @return An `sf` data frame containing doughnut geometries for each input feature.
+#'   The first geometry in each row is preserved, and the rest are doughnut-shaped differences.
+#'
+#' @importFrom sf st_geometry st_difference st_crs st_sfc
+#' @importFrom purrr map map2 map_lgl
+#' @export
 doughnut_builder <- function(poly_list) {
 
   # Validate input
@@ -23,7 +37,7 @@ doughnut_builder <- function(poly_list) {
                            function(x) x + (0:(length(poly_list)-1) * nrows))
 
   # calculate the differences - create doughnuts
-  the_doughnuts <- do.call(rbind, map(object_indices, function(idx) {
+  the_doughnuts <- do.call(rbind, purrr::map(object_indices, function(idx) {
     single_object <- combined[idx, ]
 
     # extract geometries only

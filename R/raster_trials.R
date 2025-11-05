@@ -73,23 +73,24 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
 
   if(any(duplicated(dist))) stop("Cannot have duplicates in 'dist' parameter")
 
-  tic("buffer")
+  # buffer sf object
   buff <- lapply(dist, sf::st_buffer, x = x)
-  toc()
 
-  tic("create doughnuts")
+  #build the doughnuts
   doughnuts <- doughnut_builder(poly_list = buff)
-  toc()
 
+  # plot the doughnuts to check
   if(plot_doughnuts){
-    ### ADD THE POSSIBILITY TO PLOT IT WITH THE ENVIRONMENTAL BACKGROUND
-    ### CODE IN GGPLOT
+    nobjects <- unique(sapply(buff, nrow))
+    if(length(nobjects) > 1)
+      stop("cannot have different numbers of objects in each buffer set")
     doughnut_checker(doughnuts, nbuffers = length(dist), object_n = object_n,
-                     nobjects = unique(sapply(buff, nrow)))
+                     nobjects = nobjects)
   }
 
   if(is.null(func)) {
-    tic("extract raw")
+
+    # extract raw values
     # get values
     #this handles edges i.e.won't count cells that aren't there
     val <- exactextractr::exact_extract(x = y,
@@ -99,21 +100,14 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
                                         include_area = TRUE,
                                         include_cols = c("ID"),
                                         include_cell = FALSE)
-    toc()
 
     val <- do.call(rbind, val)
-
-    tic("calculate area")
-    # calculate the area of the cell that is covered by the ppolygons
-    val$amount_cell_in <- val$cellArea*val$coverage_fraction
-
-    toc()
 
     return(list(value = val$value, area = val$area*val$coverage_fraction))
 
   } else if(inherits(func, "character") | inherits(func, "function")){
 
-    tic("extract summary")
+    # extract summary values
     # get values
     #this handles edges i.e.won't count cells that aren't there
     val <- exactextractr::exact_extract(x = y,
@@ -122,9 +116,8 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
                                         force_df = FALSE)
     #convert to matrix
     val <- matrix(val, nrow = nrow(x))
-    toc()
 
-    tic("extract area of polys")
+    # extract area of each doughnut
     # Calculate area of the doughnuts
     area <- terra::cellSize(y, unit = "m")
     #this handles edges i.e.won't count cells that aren't there
@@ -133,7 +126,6 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
                                             fun = "sum",
                                             force_df = FALSE)
     areaval <- matrix(areaval, nrow = nrow(x))
-    toc()
 
     return(list(value = val, area = areaval))
 
