@@ -77,13 +77,13 @@ ggplot() +
   return(object)
 }
 
-# x = seedtraps
-# y = renv
-# dist_seq = c(20, 40)
-# mindist = NULL
-# maxdist = NULL
-# incdist = NULL
-# bound_poly = NULL
+x = seedtraps
+y = renv
+dist_seq = c(20, 40)
+mindist = NULL
+maxdist = NULL
+incdist = NULL
+bound_poly = NULL
 
 # function to
 lg_rast <- function(x,

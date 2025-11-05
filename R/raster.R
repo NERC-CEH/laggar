@@ -71,20 +71,20 @@ doughnut_builder <- function(poly_list) {
 # function to plot single object across all buffer sizes
 doughnut_checker <- function(doughnut_out, # output of doughnut_builder
                              nbuffers, # number of buffers implemented
-                             nobjects, # number of objects that were originally buffered
-                             object_n = 1, # the number of object that you want to check (i.e. which buffered point do you want plotted). Can be NULL if want to skip single object check, not recommended.
+                             nobjects, # number of objects/measurement points that were originally buffered
+                             object_n = 1, # the number of object that you want to check (i.e. which buffered point do you want plotted). Can be NULL if want to skip single object check, not recommended. Currently might be coded for plotting > 1 object.
                              bg_layer = NULL) # background raster layer for more plotting context
 {
 
   if(nbuffers>9)
     stop("Maximum number of buffers for plotting is 9.")
-  if(object_n > nobjects)
+  if(max(object_n) > nobjects | any(object_n > nobjects ))
     stop("The object chosen for plotting must be in range 0:nobjects")
 
 
   # create an index for plotting
-  index_for_plotting <-
-    (0:(nbuffers-1) * nobjects) + object_n
+  index_for_plotting <- lapply(object_n, function(x) (0:(nbuffers-1) * nobjects) + x)
+  # (0:(nbuffers-1) * nobjects) + object_n
   message("plotting object indices ", paste(index_for_plotting, collapse = ", "))
 
   # create colour palette and add to plotting dataframe
@@ -114,21 +114,24 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 
   ## plot specific layer
   plts <- lapply(1:length(index_for_plotting), function(x)
-    ggplot() +
-      {if(!is.null(bg_layer)) geom_tile(data = bg_layer, aes(x, y, fill = val))} +
-      scale_fill_viridis_c(option = "D", name = NULL) +
-      ggnewscale::new_scale_fill() +
-      geom_sf(data = doughnut_out[index_for_plotting[x],],
-              aes(fill =  buffer_name), alpha = 0.7) +
+    lapply(1:length(index_for_plotting[[x]]), function(i)
+      ggplot() +
+        {if(!is.null(bg_layer)) geom_tile(data = bg_layer, aes(x, y, fill = val))} +
+        scale_fill_viridis_c(option = "D", name = NULL) +
+        ggnewscale::new_scale_fill() +
+        geom_sf(data = doughnut_out[index_for_plotting[[x]][i],],
+                aes(fill =  buffer_name), alpha = 0.7) +
 
-      scale_fill_manual(values = colpal, name = NULL, guide = "none") +
-      ggtitle(paste("Buffer distance", unique(doughnut_out[index_for_plotting[x],]$buffer_name))) +
-      coord_sf(xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
-               ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)]) +
-      theme_bw()
+        scale_fill_manual(values = colpal, name = NULL, guide = "none") +
+        labs(title = paste("Object number", index_for_plotting[[x]][i]),
+                subtitle = paste("Buffer distance", unique(doughnut_out[index_for_plotting[[x]][i],]$buffer_name))) +
+        coord_sf(xlim = st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(1, 3)],
+                 ylim = st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(2, 4)]) +
+        theme_bw()
+    )
   )
 
-  patchwork::wrap_plots(plts, guides = "collect")
+    patchwork::wrap_plots(unlist(plts), guides = "collect", ncol = nbuffers)
 
 }
 
@@ -136,6 +139,16 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 
 
 # function to do a calculation based on areas within doughnuts
+
+#' @param x The measurement points
+#' @param y The raster to summarise
+#' @param dist The distances by which to buffer each of the measurement points
+#' @param func Function by which to summarise the values within each doughnut. Default
+#'      is NULL which returns the raw values. Can be a function listed in exactextractr::exact_extract
+#'      or a custom function which takes a vector and returns a single value
+#' @param plot_doughnuts Boolean. Plot the doughnuts that were created. Optional but highly
+#'      highly recommended to verify the buffering does what you expect
+#' @param object_n  The (row number of the) measurement point to plot. Only accepts single integer.
 values_within_dist_rast <- function(x, y, dist, func = NULL,
                                     plot_doughnuts = TRUE, object_n = 1) {
 
