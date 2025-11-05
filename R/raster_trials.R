@@ -274,6 +274,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
                              object_n = 1, # the number of object that you want to check (i.e. which buffered point do you want plotted). Can be NULL if want to skip single object check, not recommended.
                              rast_bg_layer = NULL) # background raster layer for more plotting context
 {
+
   if(nbuffers>9)
     stop("Maximum number of buffers for plotting is 9.")
   if(object_n > nobjects)
@@ -285,54 +286,30 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
     (0:(nbuffers-1) * nobjects) + object_n
   message("plotting object indices ", paste(index_for_plotting, collapse = ", "))
 
-  # create colour palette
+  # create colour palette and add to plotting dataframe
   col_palette <- palette.colors(n = nbuffers)
-
-
-  # base plot plotting solution
-  tic()
-  plot(st_geometry(doughnut_out),
-       col = rep(col_palette, each = dim(doughnut_out)[1]/nbuffers),
-       main = "All buffered regions")
-
-  if(!is.null(object_n)){
-    par(mfrow = c(1, nbuffers))
-    lapply(1:length(index_for_plotting), function(x)
-      (plot(st_geometry(doughnut_out[index_for_plotting[x],]),
-            xlim = st_bbox(doughnut_out[max(index_for_plotting),])[c(1, 3)],
-            ylim = st_bbox(doughnut_out[max(index_for_plotting),])[c(2, 4)],
-            col = col_palette[x],
-            main = paste("Buffered region", x))))
-    par(mfrow = c(1, 1))
-  }
-  toc()
-
-
-  ### ggplot solution
-  tic()
   colpal <- rep(col_palette, each = dim(doughnut_out)[1]/nbuffers)
+  doughnut_out$buffer_name <- rep(factor(dist), each = dim(doughnut_out)[1]/nbuffers)
+  names(colpal) <- doughnut_out$buffer_name
 
-  if(terra::nlyr(rast_bg_layer) > 1)
-    warning("'rast_bg_layer' has more than one layer, using first layer for plotting")
-
+  # process raster if supplied
   if(!is.null(rast_bg_layer)){
+    if(terra::nlyr(rast_bg_layer) > 1)
+      warning("'rast_bg_layer' has more than one layer, using first layer for plotting")
     rast_bg_layer <- as.data.frame(rast_bg_layer,xy = TRUE)
     names(rast_bg_layer) <- c("x", "y", "lyr")
   }
 
-  doughnut_out$buffer_name <- rep(factor(dist), each = dim(doughnut_out)[1]/nbuffers)
-  names(colpal) <- doughnut_out$buffer_name
-
+  # plot all buffers in one plot
   ggplot() +
     {if(!is.null(rast_bg_layer)) geom_tile(data = rast_bg_layer, aes(x, y, fill = lyr))} +
     scale_fill_viridis_c(option = "D", name = NULL) +
-    ggnewscale::new_scale_fill() +geom_sf(data = doughnut_out, aes(fill =  buffer_name), alpha = 0.7) +
+    ggnewscale::new_scale_fill() +
+    geom_sf(data = doughnut_out, aes(fill =  buffer_name), alpha = 0.7) +
     scale_fill_manual(values =  colpal, name = "Buffer distance") +
     theme_bw()
 
-  ## all objects
-
-
+  ## plot specific layer
   plts <- lapply(1:length(index_for_plotting), function(x)
     ggplot() +
       {if(!is.null(rast_bg_layer)) geom_tile(data = rast_bg_layer, aes(x, y, fill = lyr))} +
@@ -349,7 +326,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
   )
 
   patchwork::wrap_plots(plts, guides = "collect")
-  toc()
+
 }
 
 
