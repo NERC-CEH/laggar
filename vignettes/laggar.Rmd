@@ -63,7 +63,7 @@ nseeds <- rpois(100, total_pred)
 Establish sequences of distance of interest
 
 ```{r}
-dist_seq <- seq(10,200,10)
+dist_seq <- seq(10,200,50)
 ```
 
 ```{r}

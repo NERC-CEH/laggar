@@ -109,7 +109,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
   }
 
   # plot all buffers in one plot
-  ggplot() +
+  allplot <- ggplot() +
     {if(!is.null(bg_layer)) geom_tile(data = bg_layer, aes(x, y, fill = val))} +
     scale_fill_viridis_c(option = "D", name = NULL) +
     ggnewscale::new_scale_fill() +
@@ -136,7 +136,8 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
     )
   )
 
-  patchwork::wrap_plots(unlist(plts), guides = "collect", ncol = nbuffers)
+  print(allplot)
+  print(patchwork::wrap_plots(unlist(plts), guides = "collect", ncol = nbuffers))
 
 }
 
@@ -277,8 +278,7 @@ lg_rast <- function(x,
                     y,
                     func = NULL,
                     dist_seq = NULL, mindist = NULL, maxdist = NULL, incdist = NULL,
-                    plot_doughnuts = TRUE, object_n = 1,
-) {
+                    plot_doughnuts = TRUE, object_n = 1) {
 
   # convert x to sf
   x <- .sf_conversion(x, "x")
@@ -318,3 +318,42 @@ lg_rast <- function(x,
 
 
 
+
+### Helper functions ########################
+
+.sf_conversion <- function(object, name = "object"){
+  if(!(any(c("sf","sfc","sfg") %in% class(object)))){
+    message(paste("Converting",name,"to sf object"))
+    object <- sf::st_as_sf(object)
+  }
+  return(object)
+}
+
+
+.index_check <- function(minindex,maxindex,incindex,index_seq){
+  if(any(c(is.null(minindex),is.null(maxindex),is.null(incindex))) & is.null(index_seq))
+    stop("Either index_seq or minindex, maxindex and incindex must be specified")
+  if(is.null(index_seq)){
+    if(!all(is.numeric(minindex),is.numeric(maxindex),is.numeric(incindex)))
+      stop("minindex, maxindex and incindex must be numeric")
+    if(!all(length(minindex)==1,length(maxindex)==1,length(incindex)==1))
+      stop("minindex, maxindex and incindex must be of length 1")
+    if(minindex <= 0){
+      stop("minindex must be greater than 0")
+    }
+    if(maxindex < minindex){
+      stop("maxindex must be greater than minindex")
+    }
+    index <- seq(minindex,maxindex,incindex)
+  } else{
+    if(!is.numeric(index_seq))
+      stop("index_seq must be numeric")
+    if(length(index_seq) < 2)
+      stop("index_seq must be of length greater than 1")
+    if(min(index_seq)<= 0){
+      stop("Smallest indexance increment must be greater than 0")
+    }
+    index <- index_seq
+  }
+  return(index)
+}
