@@ -1,4 +1,3 @@
-rm(list = ls())
 
 library(terra)
 library(prioritizr)
@@ -10,6 +9,7 @@ library(mgcv)
 library(purrr)
 library(tictoc)
 
+source("R/raster.R")
 
 ## simulate spatial data
 set.seed(100230)
@@ -84,53 +84,6 @@ mindist = NULL
 maxdist = NULL
 incdist = NULL
 bound_poly = NULL
-
-# function to
-lg_rast <- function(x,
-                    y,
-                    func = NULL, # function to summarise the data within each of the buffers (as specified in exactextractr::exact_extract. If NULL it returns raw values for each cell within the buffer
-                    #bound_poly = NULL, -- no need for bound poly because the area is limited by the raster
-                    dist_seq = NULL, mindist = NULL, maxdist = NULL, incdist = NULL, # buffer specification
-                    plot_doughnuts = TRUE # plot the doughnuts for error checking - highly recommended!!
-) {
-
-  # convert x to sf
-  x <- .sf_conversion(x, "x")
-
-  # what tests are needed for x and y ?!?!?!
-  if(!inherits(y, "SpatRaster"))
-    stop("y must be of class 'SpatRaster'")
-
-  # if (!all(sf::st_geometry_type(x) == "POINT"))
-  #   stop("x must be a sf object including only POINT geometries")
-  # if (!all(sf::st_geometry_type(y) == "POINT"))
-  #   stop("y must be a sf object including only POINT geometries")
-  # if (!is.null(bound_poly)) {
-  #   bound_poly <- .sf_conversion(bound_poly, "bound_poly")
-  #   if (length(bound_poly) != 1 | length(sf::st_geometry_type(bound_poly)) !=
-  #       1)
-  #     stop("bound_poly must be a sf object comprising a single polygon")
-  #   if (sf::st_geometry_type(bound_poly) != "POLYGON")
-  #     stop("bound_poly must be a sf object comprising a single polygon")
-  # }
-
-  dist <- .index_check(minindex = mindist, maxindex = maxdist,
-                       incindex = incdist, index_seq = dist_seq)
-
-  # calculate values within distance
-  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist = dist,
-                                     plot_doughnuts = plot_doughnuts)
-
-  # calculate value per area
-  value_parea <-sumdist$value/sumdist$area
-
-
-  return(list(buffer_values = sumdist$value, buffer_area = sumdist$area,
-              value_parea = value_parea))
-
-}
-
-
 
 
 

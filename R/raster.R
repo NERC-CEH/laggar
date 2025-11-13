@@ -1,6 +1,6 @@
 
 
-#' Build Doughnut Geometries from a List of sf Data Frames
+#' Build doughnut geometries from a list of sf data frames
 #'
 #' This function takes a list of `sf` data frames representing progressively buffered geometries
 #' and returns a new `sf` object where each row contains a doughnut-shaped geometry
@@ -41,10 +41,10 @@ doughnut_builder <- function(poly_list) {
     single_object <- combined[idx, ]
 
     # extract geometries only
-    geoms <- st_geometry(single_object)
+    geoms <- sf::st_geometry(single_object)
 
     # Compute doughnuts: outer buffer minus inner buffer
-    diffs <- map2(
+    diffs <- purrr::map2(
       geoms[-1],  # outer buffers
       geoms[-length(geoms)],  # inner buffers
       st_difference,
@@ -52,7 +52,7 @@ doughnut_builder <- function(poly_list) {
     )
 
     # give the differences the same crs and combine
-    geom_col <- do.call(c, lapply(diffs, st_sfc, crs = st_crs(geoms)))
+    geom_col <- do.call(c, lapply(diffs, sf::st_sfc, crs = st_crs(geoms)))
 
     # add the initial object
     st_geometry(single_object) <- c(geoms[1,], geom_col)
@@ -68,7 +68,14 @@ doughnut_builder <- function(poly_list) {
 
 
 
-# function to plot single object across all buffer sizes
+#' Plot all the buffered polygons and a single object
+#'
+#' @param doughnut_out An 'sf'
+#' @param name
+#' @param name
+#' @param name
+#' @param name
+#' @export
 doughnut_checker <- function(doughnut_out, # output of doughnut_builder
                              nbuffers, # number of buffers implemented
                              nobjects, # number of objects/measurement points that were originally buffered
@@ -124,14 +131,14 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 
         scale_fill_manual(values = colpal, name = NULL, guide = "none") +
         labs(title = paste("Object number", index_for_plotting[[x]][i]),
-                subtitle = paste("Buffer distance", unique(doughnut_out[index_for_plotting[[x]][i],]$buffer_name))) +
+             subtitle = paste("Buffer distance", unique(doughnut_out[index_for_plotting[[x]][i],]$buffer_name))) +
         coord_sf(xlim = st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(1, 3)],
                  ylim = st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(2, 4)]) +
         theme_bw()
     )
   )
 
-    patchwork::wrap_plots(unlist(plts), guides = "collect", ncol = nbuffers)
+  patchwork::wrap_plots(unlist(plts), guides = "collect", ncol = nbuffers)
 
 }
 
@@ -149,6 +156,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 #' @param plot_doughnuts Boolean. Plot the doughnuts that were created. Optional but highly
 #'      highly recommended to verify the buffering does what you expect
 #' @param object_n  The (row number of the) measurement point to plot. Only accepts single integer.
+#' @export
 values_within_dist_rast <- function(x, y, dist, func = NULL,
                                     plot_doughnuts = TRUE, object_n = 1) {
 
@@ -215,5 +223,102 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
          For a full list of available functions see '?exactextractr::exact_extract'.")
 
 }
+
+
+
+#' Summarize raster within incremental buffer zones around points
+#'
+#' This function calculates raster values within concentric buffer zones ("doughnuts")
+#' around a set of measurement points. It optionally applies a summary function to
+#' raster values within each buffer and returns raw values or aggregated summaries.
+#'
+#' @param x An object representing measurement points. Can be an `sf` object or
+#'   convertible to `sf` via internal helper functions.
+#' @param y A `SpatRaster` object from the `terra` package representing the raster
+#'   to summarize.
+#' @param func Optional. A function or character string specifying how to summarize
+#'   raster values within each buffer. If `NULL`, raw cell values are returned.
+#'   Accepts functions supported by `exactextractr::exact_extract` or a custom
+#'   function that takes a numeric vector and returns a single value.
+#' @param dist_seq Optional numeric vector of buffer distances. If provided, overrides
+#'   `mindist`, `maxdist`, and `incdist`.
+#' @param mindist, maxdist, incdist Numeric values specifying the minimum distance,
+#'   maximum distance, and increment for generating buffer distances. Ignored if
+#'   `dist_seq` is supplied.
+#' @param plot_doughnuts Logical. If `TRUE`, plots the doughnut geometries for
+#'   visual verification. Highly recommended for error checking.
+#'
+#' @details Internally, this function:
+#'   \enumerate{
+#'     \item Converts `x` to an `sf` object.
+#'     \item Validates that `y` is a `SpatRaster`.
+#'     \item Generates buffer distances using `.index_check()`.
+#'     \item Builds doughnut geometries and extracts raster values using
+#'           `values_within_dist_rast()`.
+#'     \item Computes value per unit area for each buffer.
+#'   }
+#'
+#' @return A list with three elements:
+#'   \describe{
+#'     \item{buffer_values}{Matrix or vector of raster values (raw or summarized) for each buffer.}
+#'     \item{buffer_area}{Matrix or vector of buffer areas corresponding to each value.}
+#'     \item{value_parea}{Numeric vector of values normalized by buffer area.}
+#'   }
+#'
+#' @importFrom sf st_buffer st_geometry
+#' @importFrom terra SpatRaster cellSize
+#' @importFrom exactextractr exact_extract
+#' @seealso \code{\link{values_within_dist_rast}}, \code{\link{doughnut_builder}}, \code{\link{doughnut_checker}}
+#' @examples
+#' \dontrun{
+#' # Example: Summarize mean raster values within 3 buffers around points
+#' lg_rast(x = points_sf, y = raster_layer, func = "mean",
+#'         mindist = 100, maxdist = 300, incdist = 100)
+#' }
+#' @export
+
+lg_rast <- function(x,
+                    y,
+                    func = NULL,
+                    dist_seq = NULL, mindist = NULL, maxdist = NULL, incdist = NULL,
+                    plot_doughnuts = TRUE, object_n = 1,
+) {
+
+  # convert x to sf
+  x <- .sf_conversion(x, "x")
+
+  # what tests are needed for x and y ?!?!?!
+  if(!inherits(y, "SpatRaster"))
+    stop("y must be of class 'SpatRaster'")
+
+  # if (!all(sf::st_geometry_type(x) == "POINT"))
+  #   stop("x must be a sf object including only POINT geometries")
+  # if (!all(sf::st_geometry_type(y) == "POINT"))
+  #   stop("y must be a sf object including only POINT geometries")
+  # if (!is.null(bound_poly)) {
+  #   bound_poly <- .sf_conversion(bound_poly, "bound_poly")
+  #   if (length(bound_poly) != 1 | length(sf::st_geometry_type(bound_poly)) !=
+  #       1)
+  #     stop("bound_poly must be a sf object comprising a single polygon")
+  #   if (sf::st_geometry_type(bound_poly) != "POLYGON")
+  #     stop("bound_poly must be a sf object comprising a single polygon")
+  # }
+
+  dist <- .index_check(minindex = mindist, maxindex = maxdist,
+                       incindex = incdist, index_seq = dist_seq)
+
+  # calculate values within distance
+  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist = dist,
+                                     plot_doughnuts = plot_doughnuts)
+
+  # calculate value per area
+  value_parea <-sumdist$value/sumdist$area
+
+
+  return(list(buffer_values = sumdist$value, buffer_area = sumdist$area,
+              value_parea = value_parea))
+
+}
+
 
 
