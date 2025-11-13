@@ -70,11 +70,11 @@ doughnut_builder <- function(poly_list) {
 
 #' Plot all the buffered polygons and a single object
 #'
-#' @param doughnut_out An 'sf'
-#' @param name
-#' @param name
-#' @param name
-#' @param name
+#' @param doughnut_out Takes the output from `doughnut_builder`. An `sf` data frame.
+#' @param nbuffers The number of buffers implemented.
+#' @param nobjects The number of measurement points that were originally buffered.
+#' @param object_n The measurement point that you want to plot separately. A single or vector of integers.
+#' @param bg_layer Background layer to plot along with the objects. Currently only accepts `terra::spatRaster`.
 #' @export
 doughnut_checker <- function(doughnut_out, # output of doughnut_builder
                              nbuffers, # number of buffers implemented
@@ -88,10 +88,8 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
   if(max(object_n) > nobjects | any(object_n > nobjects ))
     stop("The object chosen for plotting must be in range 0:nobjects")
 
-
   # create an index for plotting
   index_for_plotting <- lapply(object_n, function(x) (0:(nbuffers-1) * nobjects) + x)
-  # (0:(nbuffers-1) * nobjects) + object_n
   message("plotting object indices ", paste(index_for_plotting, collapse = ", "))
 
   # create colour palette and add to plotting dataframe
@@ -145,7 +143,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 
 
 
-# function to do a calculation based on areas within doughnuts
+# Extract raw values or summaries based on data within doughnuts
 
 #' @param x The measurement points
 #' @param y The raster to summarise
@@ -180,8 +178,7 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
   if(is.null(func)) {
 
     # extract raw values
-    # get values
-    #this handles edges i.e.won't count cells that aren't there
+    # this handles edges i.e.won't count cells that aren't there
     val <- exactextractr::exact_extract(x = y,
                                         y = doughnuts,
                                         fun = func,
@@ -196,9 +193,8 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
 
   } else if(inherits(func, "character") | inherits(func, "function")){
 
-    # extract summary values
-    # get values
-    #this handles edges i.e.won't count cells that aren't there
+    # extract summary values by polygon
+    # this handles edges i.e.won't count cells that aren't there
     val <- exactextractr::exact_extract(x = y,
                                         y = doughnuts,
                                         fun = func,
