@@ -12,8 +12,6 @@
 #' @return An `sf` data frame containing doughnut geometries for each input feature.
 #'   The first geometry in each row is preserved, and the rest are doughnut-shaped differences.
 #'
-#' @importFrom sf st_geometry st_difference st_crs st_sfc
-#' @importFrom purrr map map2 map_lgl
 #' @export
 doughnut_builder <- function(poly_list) {
 
@@ -72,19 +70,24 @@ doughnut_builder <- function(poly_list) {
 #'
 #' @param doughnut_out Takes the output from `doughnut_builder`. An `sf` data frame.
 #' @param nbuffers The number of buffers implemented.
+#' @param dist_seq Numeric vector. Distances (in map units) for buffering each measurement point.
+#'   Each value represents the outer radius of a doughnut. Must be unique and positive.
 #' @param nobjects The number of measurement points that were originally buffered.
 #' @param object_n The measurement point that you want to plot separately. A single or vector of integers.
 #' @param bg_layer Background layer to plot along with the objects. Currently only accepts `terra::spatRaster`.
+#' @return Plots showing all buffered objects and the different buffers for the object chosen in `object_n`.
+#' Returns list containing ggplot objects
 #' @export
 doughnut_checker <- function(doughnut_out, # output of doughnut_builder
                              nbuffers, # number of buffers implemented
+                             dist_seq, # buffer distances
                              nobjects, # number of objects/measurement points that were originally buffered
                              object_n = 1, # the number of object that you want to check (i.e. which buffered point do you want plotted). Can be NULL if want to skip single object check, not recommended. Currently might be coded for plotting > 1 object.
                              bg_layer = NULL) # background raster layer for more plotting context
 {
 
   if(nbuffers>9)
-    stop("Maximum number of buffers for plotting is 9.")
+    message("Maximum number of buffers for plotting is 9. Recycling colours, plot may look odd.")
   if(max(object_n) > nobjects | any(object_n > nobjects ))
     stop("The object chosen for plotting must be in range 0:nobjects")
 
@@ -93,9 +96,9 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
   message("plotting object indices ", paste(index_for_plotting, collapse = ", "))
 
   # create colour palette and add to plotting dataframe
-  col_palette <- palette.colors(n = nbuffers)
+  col_palette <- palette.colors(n = nbuffers, recycle = TRUE)
   colpal <- rep(col_palette, each = dim(doughnut_out)[1]/nbuffers)
-  doughnut_out$buffer_name <- rep(factor(dist), each = dim(doughnut_out)[1]/nbuffers)
+  doughnut_out$buffer_name <- rep(factor(dist_seq), each = dim(doughnut_out)[1]/nbuffers)
   names(colpal) <- doughnut_out$buffer_name
 
   # process raster if supplied
@@ -135,34 +138,79 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
         theme_bw()
     )
   )
-
+  obj_plot <- patchwork::wrap_plots(unlist(plts), guides = "collect")
   print(allplot)
-  print(patchwork::wrap_plots(unlist(plts), guides = "collect", ncol = nbuffers))
+  print(obj_plot)
+
+  return(list(allbuffers = allplot,
+              objectplots = obj_plot))
 
 }
 
-
-
-
-# Extract raw values or summaries based on data within doughnuts
-
-#' @param x The measurement points
-#' @param y The raster to summarise
-#' @param dist The distances by which to buffer each of the measurement points
-#' @param func Function by which to summarise the values within each doughnut. Default
-#'      is NULL which returns the raw values. Can be a function listed in exactextractr::exact_extract
-#'      or a custom function which takes a vector and returns a single value
-#' @param plot_doughnuts Boolean. Plot the doughnuts that were created. Optional but highly
-#'      highly recommended to verify the buffering does what you expect
-#' @param object_n  The (row number of the) measurement point to plot. Only accepts single integer.
+#' Extract raster values or summaries within concentric buffers ("doughnuts")
+#'
+#' This function creates concentric buffer zones (doughnuts) around measurement points
+#' and extracts raster values within each zone. It can return either raw cell values
+#' or summary statistics (e.g., mean, sum) for each doughnut. Optionally, it can plot
+#' the doughnuts for visual verification.
+#'
+#' @param x `sf` object. Measurement points around which buffers will be created.
+#' @param y Raster object (`terra` SpatRaster). The raster to summarize.
+#' @param dist_seq Numeric vector. Distances (in map units) for buffering each measurement point.
+#'   Each value represents the outer radius of a doughnut. Must be unique and positive.
+#' @param func Summary function applied to raster values within each doughnut.
+#'   Default is `NULL`, which returns raw cell values. Can be:
+#'   \itemize{
+#'     \item A character string naming a function supported by \code{exactextractr::exact_extract}
+#'           (e.g., `"mean"`, `"sum"`, `"median"`).
+#'     \item A custom function that takes a numeric vector and returns a single value.
+#'   }
+#' @param plot_doughnuts Logical. If `TRUE`, plots the doughnuts for visual verification.
+#'   Recommended to ensure buffering behaves as expected.
+#' @param object_n Integer. Row number of the measurement point to plot when
+#'   \code{plot_doughnuts = TRUE}. Only a single integer is accepted.
+#' @param bg_layer Background layer to plot along with the objects. Currently only accepts `terra::spatRaster`.
+#'
+#' @return A list with two elements:
+#'   \describe{
+#'     \item{\code{value}}{Matrix or vector of extracted values or summary statistics.
+#'       Rows correspond to measurement points; columns correspond to doughnuts.}
+#'     \item{\code{area}}{Matrix or vector of areas (in square meters) for each doughnut,
+#'       accounting for partial cell coverage.}
+#'   }
+#'
+#' @details
+#' The function uses \code{exactextractr::exact_extract} to handle partial cell coverage
+#' at polygon edges. When \code{func = NULL}, raw cell values are returned along with
+#' their corresponding areas. When \code{func} is provided, summary statistics are computed
+#' for each doughnut.
+#'
+#' @examples
+#' \dontrun{
+#' # Example: Summarize mean raster values within 100m and 500m doughnuts
+#' result <- values_within_dist_rast(
+#'   x = points_sf,
+#'   y = raster_layer,
+#'   dist_seq = c(100, 500),
+#'   func = "mean",
+#'   plot_doughnuts = TRUE
+#' )
+#'
+#' # Access results
+#' result$value   # matrix of mean values per doughnut
+#' result$area    # matrix of areas per doughnut
+#' }
+#'
+#' @seealso \code{\link[exactextractr]{exact_extract}}, \code{\link[sf]{st_buffer}}, \code{\link[terra]{cellSize}}
 #' @export
-values_within_dist_rast <- function(x, y, dist, func = NULL,
-                                    plot_doughnuts = TRUE, object_n = 1) {
+values_within_dist_rast <- function(x, y, dist_seq, func = NULL,
+                                    plot_doughnuts = TRUE, object_n = 1,
+                                    bg_layer = NULL) {
 
-  if(any(duplicated(dist))) stop("Cannot have duplicates in 'dist' parameter")
+  if(any(duplicated(dist_seq))) stop("Cannot have duplicates in 'dist_seq' parameter")
 
   # buffer sf object
-  buff <- lapply(dist, sf::st_buffer, x = x)
+  buff <- lapply(dist_seq, sf::st_buffer, x = x)
 
   #build the doughnuts
   doughnuts <- doughnut_builder(poly_list = buff)
@@ -172,8 +220,8 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
     nobjects <- unique(sapply(buff, nrow))
     if(length(nobjects) > 1)
       stop("cannot have different numbers of objects in each buffer set")
-    doughnut_checker(doughnuts, nbuffers = length(dist), object_n = object_n,
-                     nobjects = nobjects)
+    doughnut_checker(doughnut_out = doughnuts, nbuffers = length(dist_seq), dist_seq = dist_seq,
+                     object_n = object_n, nobjects = nobjects, bg_layer = bg_layer)
   }
 
   if(is.null(func)) {
@@ -244,6 +292,7 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
 #'   `dist_seq` is supplied.
 #' @param plot_doughnuts Logical. If `TRUE`, plots the doughnut geometries for
 #'   visual verification. Highly recommended for error checking.
+#' @param bg_layer Background layer to plot along with the objects. Currently only accepts `terra::spatRaster`.
 #'
 #' @details Internally, this function:
 #'   \enumerate{
@@ -262,9 +311,6 @@ values_within_dist_rast <- function(x, y, dist, func = NULL,
 #'     \item{value_parea}{Numeric vector of values normalized by buffer area.}
 #'   }
 #'
-#' @importFrom sf st_buffer st_geometry
-#' @importFrom terra SpatRaster cellSize
-#' @importFrom exactextractr exact_extract
 #' @seealso \code{\link{values_within_dist_rast}}, \code{\link{doughnut_builder}}, \code{\link{doughnut_checker}}
 #' @examples
 #' \dontrun{
@@ -278,7 +324,8 @@ lg_rast <- function(x,
                     y,
                     func = NULL,
                     dist_seq = NULL, mindist = NULL, maxdist = NULL, incdist = NULL,
-                    plot_doughnuts = TRUE, object_n = 1) {
+                    plot_doughnuts = TRUE, object_n = 1,
+                    bg_layer = NULL) {
 
   # convert x to sf
   x <- .sf_conversion(x, "x")
@@ -304,8 +351,9 @@ lg_rast <- function(x,
                        incindex = incdist, index_seq = dist_seq)
 
   # calculate values within distance
-  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist = dist,
-                                     plot_doughnuts = plot_doughnuts)
+  sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist_seq = dist,
+                                     plot_doughnuts = plot_doughnuts,
+                                     bg_layer = bg_layer)
 
   # calculate value per area
   value_parea <-sumdist$value/sumdist$area
@@ -319,41 +367,41 @@ lg_rast <- function(x,
 
 
 
-### Helper functions ########################
-
-.sf_conversion <- function(object, name = "object"){
-  if(!(any(c("sf","sfc","sfg") %in% class(object)))){
-    message(paste("Converting",name,"to sf object"))
-    object <- sf::st_as_sf(object)
-  }
-  return(object)
-}
-
-
-.index_check <- function(minindex,maxindex,incindex,index_seq){
-  if(any(c(is.null(minindex),is.null(maxindex),is.null(incindex))) & is.null(index_seq))
-    stop("Either index_seq or minindex, maxindex and incindex must be specified")
-  if(is.null(index_seq)){
-    if(!all(is.numeric(minindex),is.numeric(maxindex),is.numeric(incindex)))
-      stop("minindex, maxindex and incindex must be numeric")
-    if(!all(length(minindex)==1,length(maxindex)==1,length(incindex)==1))
-      stop("minindex, maxindex and incindex must be of length 1")
-    if(minindex <= 0){
-      stop("minindex must be greater than 0")
-    }
-    if(maxindex < minindex){
-      stop("maxindex must be greater than minindex")
-    }
-    index <- seq(minindex,maxindex,incindex)
-  } else{
-    if(!is.numeric(index_seq))
-      stop("index_seq must be numeric")
-    if(length(index_seq) < 2)
-      stop("index_seq must be of length greater than 1")
-    if(min(index_seq)<= 0){
-      stop("Smallest indexance increment must be greater than 0")
-    }
-    index <- index_seq
-  }
-  return(index)
-}
+# ### Helper functions ########################
+#
+# .sf_conversion <- function(object, name = "object"){
+#   if(!(any(c("sf","sfc","sfg") %in% class(object)))){
+#     message(paste("Converting",name,"to sf object"))
+#     object <- sf::st_as_sf(object)
+#   }
+#   return(object)
+# }
+#
+#
+# .index_check <- function(minindex,maxindex,incindex,index_seq){
+#   if(any(c(is.null(minindex),is.null(maxindex),is.null(incindex))) & is.null(index_seq))
+#     stop("Either index_seq or minindex, maxindex and incindex must be specified")
+#   if(is.null(index_seq)){
+#     if(!all(is.numeric(minindex),is.numeric(maxindex),is.numeric(incindex)))
+#       stop("minindex, maxindex and incindex must be numeric")
+#     if(!all(length(minindex)==1,length(maxindex)==1,length(incindex)==1))
+#       stop("minindex, maxindex and incindex must be of length 1")
+#     if(minindex <= 0){
+#       stop("minindex must be greater than 0")
+#     }
+#     if(maxindex < minindex){
+#       stop("maxindex must be greater than minindex")
+#     }
+#     index <- seq(minindex,maxindex,incindex)
+#   } else{
+#     if(!is.numeric(index_seq))
+#       stop("index_seq must be numeric")
+#     if(length(index_seq) < 2)
+#       stop("index_seq must be of length greater than 1")
+#     if(min(index_seq)<= 0){
+#       stop("Smallest indexance increment must be greater than 0")
+#     }
+#     index <- index_seq
+#   }
+#   return(index)
+# }

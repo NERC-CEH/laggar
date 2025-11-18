@@ -2,7 +2,7 @@
 library(terra)
 library(prioritizr)
 library(tidyterra)
-library(laggar)
+# library(laggar)
 library(sf)
 library(ggplot2)
 library(mgcv)

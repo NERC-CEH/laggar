@@ -2,43 +2,46 @@
 title: "laggar"
 output: rmarkdown::html_vignette
 vignette: >
-%\VignetteIndexEntry{laggar}
-%\VignetteEngine{knitr::rmarkdown}
-%\VignetteEncoding{UTF-8}
-  ---
-  
+  %\VignetteIndexEntry{laggar}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
 ```{r, include = FALSE}
-  knitr::opts_chunk$set(
+knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
-  )
+)
 ```
-  
-```{r setup}
-  library(laggar)
-  library(sf)
-  library(ggplot2)
-  library(mgcv)
-```
-  
-  # Simulate data
-  
+
 ```{r}
-  set.seed(100230)
+# install laggar if not already installed
+# remotes::install_github("NERC-CEH/laggar")
+```
+
+
+```{r setup}
+library(laggar)
+library(sf)
+library(ggplot2)
+library(mgcv)
+```
+
+# Simulate data
+
+```{r}
+set.seed(100230)
 boundary <- st_polygon(list(matrix(c(0,1000,1000,0,0,
-0,0,1000,1000,0),ncol=2)))
-
+                                     0,0,1000,1000,0),ncol=2)))
 adults <- st_sample(boundary, size = 300)
-
 seedtraps <- data.frame(
-x = rep(seq(50,950,100), 10),
-y = rep(seq(50,950,100), each = 10)
+  x = rep(seq(50,950,100), 10),
+  y = rep(seq(50,950,100), each = 10)
 ) |>
-st_as_sf(coords = c("x","y"), remove = FALSE)
-
+  st_as_sf(coords = c("x","y"), remove = FALSE)
 ggplot() + geom_sf(data = boundary) + geom_sf(data = adults) +
-geom_sf(data = seedtraps, colour = "red") +
-theme_void()
+  geom_sf(data = seedtraps, colour = "red") +
+  theme_void()
 ```
 
 Now simulate number of seeds by using number of trees within distance (ignoring boundary effects of polygon for this):
@@ -50,7 +53,7 @@ medium_distance <- sum_within_dist(seedtraps, adults, boundary, 75)
 long_distance <- sum_within_dist(seedtraps, adults, boundary, 125)
 vlong_distance <- sum_within_dist(seedtraps, adults, boundary, 200)
 
-total_pred <- -0.5*vshort_distance[[1]] + 1*short_distance[[1]] +
+total_pred <- -0.5*short_distance[[1]] + 1*short_distance[[1]] +
   0.2*medium_distance[[1]] + 
   0.05*long_distance[[1]] + 0.01*vlong_distance[[1]]
 
@@ -63,50 +66,13 @@ nseeds <- rpois(100, total_pred)
 Establish sequences of distance of interest
 
 ```{r}
-dist_seq <- seq(10,200,50)
+dist_seq <- seq(10,200,10)
 ```
 
 ```{r}
-
-x = seedtraps
-y = adults
-dist_seq = dist_seq
-poly = boundary
-
-dist <- laggar:::.index_check(minindex = NULL, maxindex = NULL, 
-                              incindex = NULL, index_seq = NULL)
-
-
-sum_within_dist(x = x, y = y, bound_poly = bound_poly, dist = 20)
-
-## sum the number of points within dist of each seedtrap
-sumdist <- lapply(dist_seq, sum_within_dist, x = x, y = y, poly = poly)
-
-## no idea what this does
-num_points <- sapply(sumdist, "[[", 1) # extracts the first item in each sublist, i.e. npoints
-num_points <- t(apply(num_points, 1, function(x) diff(c(0, 
-                                                        x))))
-
-
-if (!is.null(poly)) {
-  buffer_area <- sapply(sumdist, "[[", 2)
-  buffer_area <- t(apply(buffer_area, 1, function(x) diff(c(0, 
-                                                            x))))
-  points_parea <- num_points/buffer_area
-} else {
-  buffer_area <- NA
-  points_parea <- NA
-}
-return(list(num_points = num_points, buffer_area = buffer_area, 
-            points_parea = points_parea))
-
-
-
-## original code from vignette...
 points_parea <- lg_points(seedtraps, adults, 
                           dist_seq = dist_seq, bound_poly = boundary)
 points_perha <- 1e4*points_parea$points_parea
-
 ```
 
 
@@ -116,57 +82,11 @@ Assemble into lagR object:
 lgr <- lg_assembly(response = nseeds, 
                    covariate = points_perha, 
                    index_seq = dist_seq)
-str(lgr)
-
-
-    index <- laggar:::.index_check(minindex = NULL, maxindex = NULL, 
-        incindex = NULL, index_seq = index_seq)
-    if (!identical(nrow(covariate), length(response))) 
-        stop("number of rows of response must be equal to length of covariate")
-    if (anyNA(covariate)) {
-        cov_na_index <- apply(covariate, 1, anyNA)
-        if (all(cov_na_index)) {
-            stop("covariate matrix has NAs present in every row")
-        }
-        else {
-            message("Removing rows where covariate matrix has NAs")
-            cov_notna_index <- !cov_na_index
-        }
-    }
-    else {
-        cov_notna_index <- rep(TRUE, length(response))
-    }
-    if (anyNA(response)) {
-        resp_na_index <- is.na(response)
-        if (all(resp_na_index)) {
-            stop("Response is entirely NAs")
-        }
-        else {
-            message("Removing rows where response is NA")
-            resp_notna_index <- !resp_na_index
-        }
-    }
-    else {
-        resp_notna_index <- rep(TRUE, length(response))
-    }
-    
-    
-    ## this ensures that the rows in both response and covariates match!
-    notna_index <- (cov_notna_index + resp_notna_index) == 2
-    response <- response[notna_index]
-    covariate <- covariate[notna_index, ]
-    index_matrix <- matrix(index, nrow = nrow(covariate), ncol = ncol(covariate), 
-        byrow = TRUE)
-    data_list <- list(response = response, covariate = covariate, 
-        index = index_matrix)
-    return(data_list)
-
-
 ```
 
 Graphical checks:
 
-```{r}
+```{r, fig.dim = c(7,5)}
 lg_plot(lgr)
 ```
 
@@ -187,4 +107,3 @@ summary(modfit)
 ```{r}
 plot(modfit)
 ```
-
