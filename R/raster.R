@@ -351,6 +351,7 @@ lg_rast <- function(x,
   # calculate values within distance
   sumdist <- values_within_dist_rast(x=x, y=y, func=func, dist_seq = dist,
                                      plot_doughnuts = plot_doughnuts,
+                                     object_n = object_n,
                                      bg_layer = bg_layer)
 
   # calculate value per area
