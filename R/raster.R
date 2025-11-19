@@ -81,7 +81,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
                              nbuffers, # number of buffers implemented
                              dist_seq, # buffer distances
                              nobjects, # number of objects/measurement points that were originally buffered
-                             object_n = 1, # the number of object that you want to check (i.e. which buffered point do you want plotted). Can be NULL if want to skip single object check, not recommended. Currently might be coded for plotting > 1 object.
+                             object_n = 1, # the number of object that you want to check (i.e. which buffered point do you want plotted). Can be NULL if want to skip single object check, not recommended.
                              bg_layer = NULL) # background raster layer for more plotting context
 {
 
@@ -167,7 +167,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 #' @param plot_doughnuts Logical. If `TRUE`, plots the doughnuts for visual verification.
 #'   Recommended to ensure buffering behaves as expected.
 #' @param object_n Integer. Row number of the measurement point to plot when
-#'   \code{plot_doughnuts = TRUE}. Only a single integer is accepted.
+#'   \code{plot_doughnuts = TRUE}. A single integer or vector of integers.
 #' @param bg_layer Background layer to plot along with the objects. Currently only accepts `terra::spatRaster`.
 #'
 #' @return A list with two elements:
