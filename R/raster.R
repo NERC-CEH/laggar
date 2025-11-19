@@ -121,22 +121,19 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 
   ## plot specific layer
   plts <- lapply(1:length(index_for_plotting), function(x)
-    lapply(1:length(index_for_plotting[[x]]), function(i)
-      ggplot() +
-        {if(!is.null(bg_layer)) geom_tile(data = bg_layer, aes(x, y, fill = val))} +
-        scale_fill_viridis_c(option = "D", name = NULL) +
-        ggnewscale::new_scale_fill() +
-        geom_sf(data = doughnut_out[index_for_plotting[[x]][i],],
-                aes(fill =  buffer_name), alpha = 0.7) +
+    ggplot() +
+      {if(!is.null(bg_layer)) geom_tile(data = bg_layer, aes(x, y, fill = val), show.legend = FALSE)} +
+      scale_fill_viridis_c(option = "D", name = NULL) +
+      ggnewscale::new_scale_fill() +
+      geom_sf(data = doughnut_out[index_for_plotting[[x]],],
+              aes(fill =  buffer_name), alpha = 0.7) +
 
-        scale_fill_manual(values = colpal, name = NULL, guide = "none") +
-        labs(title = paste("Object number", index_for_plotting[[x]][i]),
-             subtitle = paste("Buffer distance", unique(doughnut_out[index_for_plotting[[x]][i],]$buffer_name))) +
-        coord_sf(xlim = sf::st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(1, 3)],
-                 ylim = sf::st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(2, 4)]) +
-        theme_bw()
+      scale_fill_manual(values = colpal,
+                        name = "Buffer distance",
+                        guide = ggplot2::guide_legend(ncol = 2)) +
+      labs(title = paste("Object number", object_n[[x]])) +
+      theme_bw()
     )
-  )
   obj_plot <- patchwork::wrap_plots(unlist(plts), guides = "collect")
   print(allplot)
   print(obj_plot)
@@ -145,6 +142,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
               objectplots = obj_plot))
 
 }
+
 
 
 
@@ -358,7 +356,6 @@ lg_rast <- function(x,
 
   # calculate value per area
   value_parea <-sumdist$value/sumdist$area
-
 
   return(list(buffer_values = sumdist$value, buffer_area = sumdist$area,
               value_parea = value_parea))

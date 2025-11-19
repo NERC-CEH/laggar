@@ -30,6 +30,8 @@ library(sf)
 library(terra)
 library(tidyverse)
 
+# devtools::load_all()
+
 ```
 
 # Simulate spatial data
@@ -98,12 +100,25 @@ dist_seq <- seq(10,200,10)
 
 ```{r}
 
-source("../R/raster.R")
+
+# x = plants
+# y = renv
+# func = "sum"
+# dist_seq = dist_seq
+# mindist = NULL
+# maxdist = NULL
+# incdist = NULL
+# plot_doughnuts = TRUE
+# object_n = 1
+# bg_layer = renv
+
+
+# source("../R/raster.R")
 rast_sum <- lg_rast(x = plants,
                     y = renv,
                     func = "sum",
                     dist_seq = dist_seq, mindist = NULL, maxdist = NULL, incdist = NULL,
-                    plot_doughnuts = TRUE, object_n = 1, bg_layer = renv)
+                    plot_doughnuts = TRUE, object_n = c(1, 10, 20), bg_layer = renv)
 
 ```
 
