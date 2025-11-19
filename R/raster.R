@@ -318,7 +318,6 @@ values_within_dist_rast <- function(x, y, dist_seq, func = NULL,
 #'         mindist = 100, maxdist = 300, incdist = 100)
 #' }
 #' @export
-
 lg_rast <- function(x,
                     y,
                     func = NULL,

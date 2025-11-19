@@ -9,7 +9,7 @@ library(mgcv)
 library(purrr)
 library(tictoc)
 
-source("R/raster.R")
+# source("R/raster.R")
 
 ## simulate spatial data
 set.seed(100230)

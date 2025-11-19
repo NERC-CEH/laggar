@@ -34,7 +34,7 @@ Default is \code{NULL}, which returns raw cell values. Can be:
 Recommended to ensure buffering behaves as expected.}
 
 \item{object_n}{Integer. Row number of the measurement point to plot when
-\code{plot_doughnuts = TRUE}. Only a single integer is accepted.}
+\code{plot_doughnuts = TRUE}. A single integer or vector of integers.}
 
 \item{bg_layer}{Background layer to plot along with the objects. Currently only accepts \code{terra::spatRaster}.}
 }
@@ -51,7 +51,7 @@ accounting for partial cell coverage.}
 This function creates concentric buffer zones (doughnuts) around measurement points
 and extracts raster values within each zone. It can return either raw cell values
 or summary statistics (e.g., mean, sum) for each doughnut. Optionally, it can plot
-the doughnuts for visual verification.
+the doughnuts for visual verification. This is highly recommended.
 }
 \details{
 The function uses \code{exactextractr::exact_extract} to handle partial cell coverage

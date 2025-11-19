@@ -25,7 +25,7 @@ vignette: >
 ```{r setup}
 library(prioritizr)
 library(tidyterra)
-# library(laggar)
+library(laggar)
 library(sf)
 library(terra)
 library(tidyverse)
