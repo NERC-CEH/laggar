@@ -1,5 +1,4 @@
 
-
 #' Build doughnut geometries from a list of sf data frames
 #'
 #' This function takes a list of `sf` data frames representing progressively buffered geometries
@@ -18,7 +17,7 @@ doughnut_builder <- function(poly_list) {
   # Validate input
   stopifnot(
     is.list(poly_list),
-    all(map_lgl(poly_list, ~ inherits(.x, "sf"))))
+    all(purrr::map_lgl(poly_list, ~ inherits(.x, "sf"))))
 
   n <- length(poly_list)
   if (n < 2) stop("Need at least two sf data frames.")
@@ -45,15 +44,15 @@ doughnut_builder <- function(poly_list) {
     diffs <- purrr::map2(
       geoms[-1],  # outer buffers
       geoms[-length(geoms)],  # inner buffers
-      st_difference,
+      sf::st_difference,
       by_feature = TRUE
     )
 
     # give the differences the same crs and combine
-    geom_col <- do.call(c, lapply(diffs, sf::st_sfc, crs = st_crs(geoms)))
+    geom_col <- do.call(c, lapply(diffs, sf::st_sfc, crs = sf::st_crs(geoms)))
 
     # add the initial object
-    st_geometry(single_object) <- c(geoms[1,], geom_col)
+    sf::st_geometry(single_object) <- c(geoms[1,], geom_col)
     single_object
 
   }))
@@ -133,8 +132,8 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
         scale_fill_manual(values = colpal, name = NULL, guide = "none") +
         labs(title = paste("Object number", index_for_plotting[[x]][i]),
              subtitle = paste("Buffer distance", unique(doughnut_out[index_for_plotting[[x]][i],]$buffer_name))) +
-        coord_sf(xlim = st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(1, 3)],
-                 ylim = st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(2, 4)]) +
+        coord_sf(xlim = sf::st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(1, 3)],
+                 ylim = sf::st_bbox(doughnut_out[max(index_for_plotting[[x]]),])[c(2, 4)]) +
         theme_bw()
     )
   )
@@ -147,12 +146,14 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 
 }
 
+
+
 #' Extract raster values or summaries within concentric buffers ("doughnuts")
 #'
 #' This function creates concentric buffer zones (doughnuts) around measurement points
 #' and extracts raster values within each zone. It can return either raw cell values
 #' or summary statistics (e.g., mean, sum) for each doughnut. Optionally, it can plot
-#' the doughnuts for visual verification.
+#' the doughnuts for visual verification. This is highly recommended.
 #'
 #' @param x `sf` object. Measurement points around which buffers will be created.
 #' @param y Raster object (`terra` SpatRaster). The raster to summarize.
