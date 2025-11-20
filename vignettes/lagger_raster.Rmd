@@ -23,6 +23,7 @@ vignette: >
 
 
 ```{r setup}
+library(prioritizr)
 library(tidyterra)
 library(laggar)
 library(sf)
@@ -47,7 +48,11 @@ seedtraps <- data.frame(
 ) |>
   st_as_sf(coords = c("x","y"), remove = FALSE,
            crs = "EPSG:32630")
+```
 
+# simulate response and locations
+
+```{r}
 # simulate response and locations
 vshort_distance <- sum_within_dist(seedtraps, adults, boundary, 10)
 short_distance <- sum_within_dist(seedtraps, adults, boundary, 25)
@@ -91,7 +96,7 @@ ggplot() +
 Establish sequences of distance of interest.
 
 ```{r}
-dist_seq <- seq(10,200,10)
+dist_seq <- seq(20,200,20)
 ```
 
 ```{r}
