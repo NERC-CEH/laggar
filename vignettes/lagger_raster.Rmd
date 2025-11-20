@@ -23,7 +23,6 @@ vignette: >
 
 
 ```{r setup}
-library(prioritizr)
 library(tidyterra)
 library(laggar)
 library(sf)
