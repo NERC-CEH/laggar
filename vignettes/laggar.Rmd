@@ -71,7 +71,7 @@ dist_seq <- seq(10,200,10)
 
 ```{r}
 points_parea <- lg_points(seedtraps, adults, 
-                          dist_seq = dist_seq, bound_poly = boundary)
+                          dist_seq = dist_seq, poly = boundary)
 points_perha <- 1e4*points_parea$points_parea
 ```
 

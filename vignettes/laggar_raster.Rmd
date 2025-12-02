@@ -1,23 +1,21 @@
 ---
 title: "Laggar raster"
-author: "Vignette Author"
-date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-%\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{laggar raster}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
   ---
   
-  ```{r, include = FALSE}
-  knitr::opts_chunk$set(
+```{r, include = FALSE}
+knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
-  )
-  ```
-  
-  ```{r}
-  # install laggar if not already installed
+)
+```
+
+```{r}
+# install laggar if not already installed
 # remotes::install_github("NERC-CEH/laggar")
 ```
 
@@ -29,6 +27,7 @@ library(laggar)
 library(sf)
 library(terra)
 library(tidyverse)
+library(mgcv)
 ```
 
 # Simulate spatial data

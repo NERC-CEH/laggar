@@ -95,7 +95,7 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
   message("plotting object indices ", paste(index_for_plotting, collapse = ", "))
 
   # create colour palette and add to plotting dataframe
-  col_palette <- palette.colors(n = nbuffers, recycle = TRUE)
+  col_palette <- grDevices::palette.colors(n = nbuffers, recycle = TRUE)
   colpal <- rep(col_palette, each = dim(doughnut_out)[1]/nbuffers)
   doughnut_out$buffer_name <- rep(factor(dist_seq), each = dim(doughnut_out)[1]/nbuffers)
   names(colpal) <- doughnut_out$buffer_name
@@ -106,34 +106,34 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
       stop("Currently not coded for bg_layer to be anything other than 'SpatRaster'")
     if(terra::nlyr(bg_layer) > 1)
       warning("'bg_layer' has more than one layer, using first layer for plotting")
-    bg_layer <- as.data.frame(bg_layer,xy = TRUE)
+    bg_layer <- terra::as.data.frame(bg_layer,xy = TRUE)
     names(bg_layer) <- c("x", "y", "val")
   }
 
   # plot all buffers in one plot
-  allplot <- ggplot() +
-    {if(!is.null(bg_layer)) geom_tile(data = bg_layer, aes(x, y, fill = val))} +
-    scale_fill_viridis_c(option = "D", name = NULL) +
+  allplot <- ggplot2::ggplot() +
+    {if(!is.null(bg_layer)) ggplot2::geom_tile(data = bg_layer, ggplot2::aes(x, y, fill = val))} +
+    ggplot2::scale_fill_viridis_c(option = "D", name = NULL) +
     ggnewscale::new_scale_fill() +
-    geom_sf(data = doughnut_out, aes(fill =  buffer_name), alpha = 0.7) +
-    scale_fill_manual(values =  colpal, name = "Buffer distance") +
-    theme_bw()
+    ggplot2::geom_sf(data = doughnut_out, ggplot2::aes(fill =  buffer_name), alpha = 0.7) +
+    ggplot2::scale_fill_manual(values =  colpal, name = "Buffer distance") +
+    ggplot2::theme_bw()
 
   ## plot specific layer
   plts <- lapply(1:length(index_for_plotting), function(x)
-    ggplot() +
-      {if(!is.null(bg_layer)) geom_tile(data = bg_layer, aes(x, y, fill = val), show.legend = FALSE)} +
-      scale_fill_viridis_c(option = "D", name = NULL) +
+    ggplot2::ggplot() +
+      {if(!is.null(bg_layer)) ggplot2::geom_tile(data = bg_layer, ggplot2::aes(x, y, fill = val), show.legend = FALSE)} +
+      ggplot2::scale_fill_viridis_c(option = "D", name = NULL) +
       ggnewscale::new_scale_fill() +
-      geom_sf(data = doughnut_out[index_for_plotting[[x]],],
-              aes(fill =  buffer_name), alpha = 0.7) +
+      ggplot2::geom_sf(data = doughnut_out[index_for_plotting[[x]],],
+                       ggplot2::aes(fill =  buffer_name), alpha = 0.7) +
 
-      scale_fill_manual(values = colpal,
-                        name = "Buffer distance",
-                        guide = ggplot2::guide_legend(ncol = 2)) +
-      labs(title = paste("Object number", object_n[[x]])) +
-      theme_bw()
-    )
+      ggplot2::scale_fill_manual(values = colpal,
+                                 name = "Buffer distance",
+                                 guide = ggplot2::guide_legend(ncol = 2)) +
+      ggplot2::labs(title = paste("Object number", object_n[[x]])) +
+      ggplot2::theme_bw()
+  )
   obj_plot <- patchwork::wrap_plots(unlist(plts), guides = "collect")
   print(allplot)
   print(obj_plot)
