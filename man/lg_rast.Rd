@@ -32,12 +32,16 @@ function that takes a numeric vector and returns a single value.}
 \item{dist_seq}{Optional numeric vector of buffer distances. If provided, overrides
 \code{mindist}, \code{maxdist}, and \code{incdist}.}
 
-\item{mindist, }{maxdist, incdist Numeric values specifying the minimum distance,
-maximum distance, and increment for generating buffer distances. Ignored if
-\code{dist_seq} is supplied.}
+\item{mindist}{The minimum distance, ignored if dist_seq is specified}
+
+\item{maxdist}{The maximum distance, ignored if dist_seq is specified}
+
+\item{incdist}{The distance increment, ignored if dist_seq is specified}
 
 \item{plot_doughnuts}{Logical. If \code{TRUE}, plots the doughnut geometries for
 visual verification. Highly recommended for error checking.}
+
+\item{object_n}{The measurement point that you want to plot separately. A single or vector of integers.}
 
 \item{bg_layer}{Background layer to plot along with the objects. Currently only accepts \code{terra::spatRaster}.}
 }

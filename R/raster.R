@@ -286,11 +286,12 @@ values_within_dist_rast <- function(x, y, dist_seq, func = NULL,
 #'   function that takes a numeric vector and returns a single value.
 #' @param dist_seq Optional numeric vector of buffer distances. If provided, overrides
 #'   `mindist`, `maxdist`, and `incdist`.
-#' @param mindist, maxdist, incdist Numeric values specifying the minimum distance,
-#'   maximum distance, and increment for generating buffer distances. Ignored if
-#'   `dist_seq` is supplied.
+#' @param mindist The minimum distance, ignored if dist_seq is specified
+#' @param maxdist The maximum distance, ignored if dist_seq is specified
+#' @param incdist The distance increment, ignored if dist_seq is specified
 #' @param plot_doughnuts Logical. If `TRUE`, plots the doughnut geometries for
 #'   visual verification. Highly recommended for error checking.
+#' @param object_n The measurement point that you want to plot separately. A single or vector of integers.
 #' @param bg_layer Background layer to plot along with the objects. Currently only accepts `terra::spatRaster`.
 #'
 #' @details Internally, this function:

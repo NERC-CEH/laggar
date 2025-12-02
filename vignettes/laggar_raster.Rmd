@@ -5,6 +5,7 @@ vignette: >
   %\VignetteIndexEntry{laggar raster}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+  %\VignetteDepends{fields}
   ---
   
 ```{r, include = FALSE}
@@ -26,7 +27,9 @@ library(tidyterra)
 library(laggar)
 library(sf)
 library(terra)
-library(tidyverse)
+library(ggplot2)
+# library(tidyverse)
+library(ggnewscale)
 library(mgcv)
 ```
 
@@ -44,7 +47,7 @@ adults <- st_sample(boundary, size = 300) %>%
 seedtraps <- data.frame(
   x = rep(seq(50,950,100), 10),
   y = rep(seq(50,950,100), each = 10)
-) |>
+) %>% 
   st_as_sf(coords = c("x","y"), remove = FALSE,
            crs = "EPSG:32630")
 ```
@@ -69,7 +72,7 @@ plants <- data.frame(
   nseeds = nseeds,
   x = round(runif(100,50,950),0),
   y = round(runif(100,50,950),0)
-) |>
+) %>% 
   st_as_sf(coords = c("x","y"), remove = FALSE,
            crs = "EPSG:32630")
 ```
