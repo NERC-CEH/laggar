@@ -5,7 +5,6 @@ vignette: >
   %\VignetteIndexEntry{laggar raster}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
-  %\VignetteDepends{fields}
   ---
   
 ```{r, include = FALSE}

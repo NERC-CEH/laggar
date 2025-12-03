@@ -112,21 +112,23 @@ doughnut_checker <- function(doughnut_out, # output of doughnut_builder
 
   # plot all buffers in one plot
   allplot <- ggplot2::ggplot() +
-    {if(!is.null(bg_layer)) ggplot2::geom_tile(data = bg_layer, ggplot2::aes(x, y, fill = val))} +
+    {if(!is.null(bg_layer)) ggplot2::geom_tile(data = bg_layer,
+                                               ggplot2::aes(.data$x, .data$y, fill = .data$val))} +
     ggplot2::scale_fill_viridis_c(option = "D", name = NULL) +
     ggnewscale::new_scale_fill() +
-    ggplot2::geom_sf(data = doughnut_out, ggplot2::aes(fill =  buffer_name), alpha = 0.7) +
+    ggplot2::geom_sf(data = doughnut_out, ggplot2::aes(fill =  .data$buffer_name), alpha = 0.7) +
     ggplot2::scale_fill_manual(values =  colpal, name = "Buffer distance") +
     ggplot2::theme_bw()
 
   ## plot specific layer
   plts <- lapply(1:length(index_for_plotting), function(x)
     ggplot2::ggplot() +
-      {if(!is.null(bg_layer)) ggplot2::geom_tile(data = bg_layer, ggplot2::aes(x, y, fill = val), show.legend = FALSE)} +
+      {if(!is.null(bg_layer)) ggplot2::geom_tile(data = bg_layer,
+                                                 ggplot2::aes(.data$x, .data$y, fill = .data$val), show.legend = FALSE)} +
       ggplot2::scale_fill_viridis_c(option = "D", name = NULL) +
       ggnewscale::new_scale_fill() +
       ggplot2::geom_sf(data = doughnut_out[index_for_plotting[[x]],],
-                       ggplot2::aes(fill =  buffer_name), alpha = 0.7) +
+                       ggplot2::aes(fill = .data$buffer_name), alpha = 0.7) +
 
       ggplot2::scale_fill_manual(values = colpal,
                                  name = "Buffer distance",
