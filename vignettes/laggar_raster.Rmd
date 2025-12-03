@@ -27,7 +27,6 @@ library(laggar)
 library(sf)
 library(terra)
 library(ggplot2)
-# library(tidyverse)
 library(ggnewscale)
 library(mgcv)
 ```
