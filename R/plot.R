@@ -26,35 +26,37 @@ lg_plot.sf <- function(data, ...){
 #' @describeIn lg_plot data.frame interface
 #' @export
 #' @importFrom rlang .data
-lg_plot.data.frame <- function(data, response, covariate, index,
+lg_plot.data.frame <- function(data, response = "response",
+                               covariate = "covariate",
+                               index = "index",
                                widths = c(0.1, 0.5, 0.5), ...){
-
+  lg_plot.list(data = data, response = response,
+               covariate = covariate, index = index, widths = widths, ...)
   # re-arrange the data to be ggplot2-compatible
-  covm <- as.data.frame(data[[covariate]])
-  indm <- as.data.frame(data[[index]])
-
-  data$.sample_id <- 1:nrow(data)
-
-  colnames(covm) <- paste0(covariate,1:ncol(covm))
-  colnames(indm) <- paste0(index,1:ncol(indm))
-
-  covdata <- cbind(data, covm) |>
-    dplyr::select(.data[[colnames(covm)]],  .data[[response]], ".sample_id") |>
-    tidyr::pivot_longer(!c(.data[[response]], ".sample_id"),
-                 values_to=covariate, names_to="mo") |>
-    dplyr::mutate(mo = as.numeric(sub(covariate, "", .data$mo)))
-  inddata <- cbind(data, indm) |>
-    dplyr::select(.data[[colnames(indm)]],  .data[[response]], ".sample_id") |>
-    tidyr::pivot_longer(!c(.data[[response]], ".sample_id"),
-                 values_to=index, names_to="mo") |>
-    dplyr::mutate(mo = as.numeric(sub(index, "", .data$mo)))
-
-  data$.x <- 1
-
-
-  .make_plot(data = data, response = response,
-             covdata = covdata, covariate = covariate,
-             inddata = inddata, index = index, widths = widths, ...)
+  # covm <- as.data.frame(data[[covariate]])
+  # indm <- as.data.frame(data[[index]])
+  #
+  # data$.sample_id <- 1:nrow(data)
+  # colnames(covm) <- paste0(covariate,1:ncol(covm))
+  # colnames(indm) <- paste0(index,1:ncol(indm))
+  #
+  # covdata <- cbind(data, covm) |>
+  #   dplyr::select(.data[[colnames(covm)]],  .data[[response]], ".sample_id") |>
+  #   tidyr::pivot_longer(!c(.data[[response]], ".sample_id"),
+  #                values_to=covariate, names_to="mo") |>
+  #   dplyr::mutate(mo = as.numeric(sub(covariate, "", .data$mo)))
+  # inddata <- cbind(data, indm) |>
+  #   dplyr::select(.data[[colnames(indm)]],  .data[[response]], ".sample_id") |>
+  #   tidyr::pivot_longer(!c(.data[[response]], ".sample_id"),
+  #                values_to=index, names_to="mo") |>
+  #   dplyr::mutate(mo = as.numeric(sub(index, "", .data$mo)))
+  #
+  # data$.x <- 1
+  #
+  #
+  # .make_plot(data = data, response = response,
+  #            covdata = covdata, covariate = covariate,
+  #            inddata = inddata, index = index, widths = widths, ...)
 }
 
 #' @describeIn lg_plot list interface
@@ -63,6 +65,12 @@ lg_plot.list <- function(data, response = "response",
                          covariate = "covariate",
                          index = "index",
                          widths = c(0.1, 0.5, 0.5), ...){
+  if(any(!c(response, covariate, index) %in% names(data))){
+    fl <- !c(response, covariate, index) %in% names(data)
+    stop(paste(paste(c(response, covariate, index)[fl], collapse = ", "),
+               "is not a named part of data"))
+  }
+
 
   # re-arrange the data to be ggplot2-compatible
   covdata <- as.data.frame(data[[covariate]])

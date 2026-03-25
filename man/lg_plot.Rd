@@ -11,7 +11,14 @@ lg_plot(...)
 
 \method{lg_plot}{sf}(data, ...)
 
-\method{lg_plot}{data.frame}(data, response, covariate, index, widths = c(0.1, 0.5, 0.5), ...)
+\method{lg_plot}{data.frame}(
+  data,
+  response = "response",
+  covariate = "covariate",
+  index = "index",
+  widths = c(0.1, 0.5, 0.5),
+  ...
+)
 
 \method{lg_plot}{list}(
   data,
