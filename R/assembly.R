@@ -15,6 +15,12 @@ lg_assembly <- function(response, covariate,
                         minindex = NULL, maxindex = NULL, incindex = NULL){
   index <- .index_check(minindex = minindex, maxindex = maxindex,
                         incindex = incindex, index_seq = index_seq)
+  if(length(index) != ncol(covariate)){
+    warning(paste("Index sequence must be of the same length as the number of",
+                  "columns within the covariate matrix. Replacing the supplied",
+                  "index with a sequence from 1 to",ncol(covariate)))
+    index <- seq(1,ncol(covariate))
+  }
   # checks
   # check if response is a numeric vector
   if(!class(response) %in% c("integer","numeric"))
@@ -24,7 +30,7 @@ lg_assembly <- function(response, covariate,
     stop("covariate must be a matrix")
 
   if(!identical(nrow(covariate), length(response)))
-    stop("number of rows of response must be equal to length of covariate")
+    stop("number of rows of covariate must be equal to length of response")
   # check for NAs
   if(anyNA(covariate)){
     cov_na_index <- apply(covariate, 1, anyNA)
@@ -105,4 +111,3 @@ lg_assembly <- function(response, covariate,
   }
   return(index)
 }
-

@@ -14,6 +14,8 @@ knitr::opts_chunk$set(
 )
 ```
 
+The laggar R package is designed to assist in data preparation for scalar-on-function regression within the mgcv package. Scalar-on-function regression can also be termed zone-of-influence modelling, or modelling over lags, and has a variety of applications. For more information on the statistical method, see the preprint of Miller et al [2025](https://doi.org/10.48550/arXiv.2508.07915).
+
 ```{r}
 # install laggar if not already installed
 # remotes::install_github("NERC-CEH/laggar")
@@ -27,7 +29,9 @@ library(ggplot2)
 library(mgcv)
 ```
 
-# Simulate data
+# Points data
+
+## Simulate data
 
 ```{r}
 set.seed(100230)
@@ -53,7 +57,7 @@ medium_distance <- sum_within_dist(seedtraps, adults, boundary, 75)
 long_distance <- sum_within_dist(seedtraps, adults, boundary, 125)
 vlong_distance <- sum_within_dist(seedtraps, adults, boundary, 200)
 
-total_pred <- -0.5*short_distance[[1]] + 1*short_distance[[1]] +
+total_pred <- -0.5*vshort_distance[[1]] + 1*short_distance[[1]] +
   0.2*medium_distance[[1]] + 
   0.05*long_distance[[1]] + 0.01*vlong_distance[[1]]
 
@@ -61,7 +65,7 @@ nseeds <- rpois(100, total_pred)
 ```
 
 
-# Now do data prep
+## Now do data prep
 
 Establish sequences of distance of interest
 
@@ -72,7 +76,7 @@ dist_seq <- seq(10,200,10)
 ```{r}
 points_parea <- lg_points(seedtraps, adults, 
                           dist_seq = dist_seq, bound_poly = boundary)
-points_perha <- 1e4*points_parea$points_parea
+points_perha <- 1e4*points_parea$value_parea
 ```
 
 
@@ -92,12 +96,109 @@ lg_plot(lgr)
 
 
 
-# Model
+## Model
 
 ```{r}
 modfit <- gam(response ~ te(index, by = covariate, bs = "tp", k = 10),
               data = lgr,
               family = "poisson", method = "REML")
+```
+
+```{r}
+summary(modfit)
+```
+
+```{r}
+plot(modfit)
+```
+
+
+# Raster data 
+
+## Simulate data
+
+Load in a couple of extra packages for data simulation and plotting:
+
+```{r setup-2}
+library(prioritizr)
+library(tidyterra)
+library(terra)
+```
+
+We'll use the sampling locations created above, for simplicity. But we'll now add a raster layer over the area of interest: 
+
+```{r}
+# background rainfall data
+r <- terra::rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:32630")
+renv <- simulate_data(x = r, n = 1, scale = 0.8, intensity = 22, sd = 1)
+st_crs(seedtraps) <- "EPSG:32630"
+
+ggplot() +
+  geom_spatraster(data = renv) +
+  geom_point(data = seedtraps, aes(x, y), colour = "black") +
+  scale_fill_viridis_c() +
+  theme_void()
+```
+
+
+Simulate a monotonically decreasing effect of the raster layer with increasing distance from the measurement point:
+
+```{r}
+val_distance <- values_within_dist_rast(seedtraps, renv, func = "mean",
+                                        dist_seq = c(50,100,150,200),
+                                        plot_doughnuts = FALSE)
+
+total_pred <- 1*val_distance$value[,1] +
+  0.3*val_distance$value[,2] + 
+  0.05*val_distance$value[,3] + 
+  0.01*val_distance$value[,3]
+
+growth_rate <- rnorm(100, total_pred,0.25)
+
+```
+
+
+## Data prep
+
+Establish sequences of distance of interest.
+
+```{r}
+dist_seq <- seq(20,200,20)
+```
+
+Extract the summary values over the sequence of distances:
+
+```{r}
+rast_sum <- lg_rast(x = seedtraps,
+                    y = renv,
+                    func = "mean",
+                    dist_seq = dist_seq, mindist = NULL, maxdist = NULL, incdist = NULL,
+                    plot_doughnuts = TRUE, object_n = c(1, 10, 20), bg_layer = renv)
+
+```
+
+
+Assemble into lagR object:
+
+```{r}
+lgr <- lg_assembly(response = growth_rate, 
+                   covariate = rast_sum$value_parea, 
+                   index_seq = dist_seq)
+```
+
+Graphical checks:
+
+```{r, fig.dim = c(7,5)}
+lg_plot(lgr)
+```
+
+
+
+## Model
+
+```{r}
+modfit <- gam(response ~ te(index, by = covariate, bs = "tp", k = 10),
+              data = lgr, method = "REML")
 ```
 
 ```{r}
