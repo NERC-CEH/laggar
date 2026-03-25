@@ -31,3 +31,4 @@ Suggests:
     tidyterra
 Config/testthat/edition: 3
 VignetteBuilder: knitr
+URL: https://nerc-ceh.github.io/laggar/
