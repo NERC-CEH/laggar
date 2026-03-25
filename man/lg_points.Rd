@@ -31,11 +31,11 @@ lg_points(
 }
 \value{
 list containing matrices of the number of points
-(\code{num_points}), buffer area (\code{buffer_area}) and average number of
-points per unit area  (\code{points_parea}) for every distance increment.
+(\code{buffer_values}), buffer area (\code{buffer_area}) and average number of
+points per unit area  (\code{value_parea}) for every distance increment.
 All matrices will have number of rows equal to the number of measurement
 points unless \code{poly = NULL} in which case \code{buffer_area} and
-\code{points_parea} will be returned as \code{NA}.
+\code{value_parea} will be returned as \code{NA}.
 }
 \description{
 Get number of points within varying distances

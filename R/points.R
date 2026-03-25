@@ -30,11 +30,11 @@ sum_within_dist <- function(x, y, poly, dist){
 #' @param incdist The distance increment, ignored if dist_seq is specified
 #'
 #' @returns list containing matrices of the number of points
-#'   (\code{num_points}), buffer area (\code{buffer_area}) and average number of
-#'   points per unit area  (\code{points_parea}) for every distance increment.
+#'   (\code{buffer_values}), buffer area (\code{buffer_area}) and average number of
+#'   points per unit area  (\code{value_parea}) for every distance increment.
 #'   All matrices will have number of rows equal to the number of measurement
 #'   points unless \code{poly = NULL} in which case \code{buffer_area} and
-#'   \code{points_parea} will be returned as \code{NA}.
+#'   \code{value_parea} will be returned as \code{NA}.
 #' @export
 #'
 lg_points <- function(x, y, dist_seq = NULL, poly = NULL,
@@ -55,8 +55,8 @@ lg_points <- function(x, y, dist_seq = NULL, poly = NULL,
     points_parea <- NA
   }
 
-  return(list(num_points = num_points,
+  return(list(buffer_values = num_points,
               buffer_area = buffer_area,
-              points_parea = points_parea))
+              value_parea = points_parea))
 }
 

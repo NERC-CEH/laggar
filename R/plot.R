@@ -76,10 +76,10 @@ lg_plot.list <- function(data, response = "response",
   inddata$.sample_id <- 1:nrow(respdf)
   respdf$.sample_id <- 1:nrow(respdf)
 
-  covdata <- tidyr::pivot_longer(covdata, !.data$.sample_id,
+  covdata <- tidyr::pivot_longer(covdata, !".sample_id",
                                  values_to = covariate, names_to = "mo")
   covdata$mo <- as.numeric(sub(covariate, "", covdata$mo))
-  inddata <- tidyr::pivot_longer(inddata, !.data$.sample_id,
+  inddata <- tidyr::pivot_longer(inddata, !".sample_id",
                                  values_to = index, names_to = "mo")
   inddata$mo <- as.numeric(sub(index, "", inddata$mo))
 
@@ -94,8 +94,8 @@ lg_plot.list <- function(data, response = "response",
                        covdata, covariate,
                        inddata, index, widths, ...){
   pl <- list(ggplot2::ggplot(respdata) +
-               ggplot2::geom_tile(ggplot2::aes_string(x=".x", y=".sample_id",
-                                                      fill=response)) +
+               ggplot2::geom_tile(ggplot2::aes(x=.data[[".x"]], y=.data[[".sample_id"]],
+                                               fill=.data[[response]])) +
                ggplot2::scale_fill_viridis_c() +
                ggplot2::scale_x_continuous(expand=ggplot2::expansion(0)) +
                ggplot2::scale_y_continuous(expand=ggplot2::expansion(0)) +
@@ -104,8 +104,8 @@ lg_plot.list <- function(data, response = "response",
                ggplot2::theme(legend.position="bottom",
                               axis.text.x=ggplot2::element_blank()),
              ggplot2::ggplot(covdata) +
-               ggplot2::geom_tile(ggplot2::aes_string(x="mo", y=".sample_id",
-                                                      fill=covariate)) +
+               ggplot2::geom_tile(ggplot2::aes(x=.data[["mo"]], y=.data[[".sample_id"]],
+                                               fill=.data[[covariate]])) +
                ggplot2::scale_fill_viridis_c() +
                ggplot2::scale_x_continuous(expand=ggplot2::expansion(0)) +
                ggplot2::scale_y_continuous(expand=ggplot2::expansion(0)) +
@@ -114,8 +114,8 @@ lg_plot.list <- function(data, response = "response",
                ggplot2::theme(legend.position="bottom",
                               axis.text.y=ggplot2::element_blank()),
              ggplot2::ggplot(inddata) +
-               ggplot2::geom_tile(ggplot2::aes_string(x="mo", y=".sample_id",
-                                                      fill=index)) +
+               ggplot2::geom_tile(ggplot2::aes(x=.data[["mo"]], y=.data[[".sample_id"]],
+                                               fill=.data[[index]])) +
                ggplot2::scale_fill_viridis_c() +
                ggplot2::scale_x_continuous(expand=ggplot2::expansion(0)) +
                ggplot2::scale_y_continuous(expand=ggplot2::expansion(0)) +
