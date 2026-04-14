@@ -12,6 +12,6 @@ To install the package, use the following code:
 
 ```
 # install.packages("remotes")
-remotes::install_github("NERC-CEH/jsdmstan")
+remotes::install_github("NERC-CEH/laggar")
 ```
 
