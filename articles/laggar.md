@@ -142,7 +142,7 @@ library(tidyterra)
 #> 
 #>     filter
 library(terra)
-#> terra 1.9.1
+#> terra 1.9.11
 ```
 
 We’ll use the sampling locations created above, for simplicity. But
