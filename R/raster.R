@@ -225,23 +225,25 @@ values_within_dist_rast <- function(x, y, dist_seq, func = NULL,
                      object_n = object_n, nobjects = nobjects, bg_layer = bg_layer)
   }
 
-  if(is.null(func)) {
+  # if(is.null(func)) {
+  #
+  #   # extract raw values
+  #   # this handles edges i.e.won't count cells that aren't there
+  #   val <- exactextractr::exact_extract(x = y,
+  #                                       y = doughnuts,
+  #                                       fun = func,
+  #                                       include_xy = TRUE,
+  #                                       include_area = TRUE,
+  #                                       include_cols = c("ID"),
+  #                                       include_cell = FALSE)
+  #
+  #   val <- do.call(rbind, val)
+  #
+  #   return(list(value = val$value, area = val$area*val$coverage_fraction))
+  #
+  # } else
 
-    # extract raw values
-    # this handles edges i.e.won't count cells that aren't there
-    val <- exactextractr::exact_extract(x = y,
-                                        y = doughnuts,
-                                        fun = func,
-                                        include_xy = TRUE,
-                                        include_area = TRUE,
-                                        include_cols = c("ID"),
-                                        include_cell = FALSE)
-
-    val <- do.call(rbind, val)
-
-    return(list(value = val$value, area = val$area*val$coverage_fraction))
-
-  } else if(inherits(func, "character") | inherits(func, "function")){
+  if(inherits(func, "character") | inherits(func, "function")){
 
     # extract summary values by polygon
     # this handles edges i.e.won't count cells that aren't there
@@ -283,7 +285,7 @@ values_within_dist_rast <- function(x, y, dist_seq, func = NULL,
 #' @param y A `SpatRaster` object from the `terra` package representing the raster
 #'   to summarize.
 #' @param func Optional. A function or character string specifying how to summarize
-#'   raster values within each buffer. If `NULL`, raw cell values are returned.
+#'   raster values within each buffer.
 #'   Accepts functions supported by `exactextractr::exact_extract` or a custom
 #'   function that takes a numeric vector and returns a single value.
 #' @param dist_seq Optional numeric vector of buffer distances. If provided, overrides
@@ -323,7 +325,7 @@ values_within_dist_rast <- function(x, y, dist_seq, func = NULL,
 #' @export
 lg_rast <- function(x,
                     y,
-                    func = NULL,
+                    func = "mean",
                     dist_seq = NULL, mindist = NULL, maxdist = NULL, incdist = NULL,
                     plot_doughnuts = TRUE, object_n = 1,
                     bg_layer = NULL) {
