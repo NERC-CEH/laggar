@@ -94,11 +94,11 @@ test_that("lg_assembly errors correctly", {
 
 test_that("lg_assembly handles NAs correctly", {
   expect_error(lg_assembly(1:4, matrix(c(1:16,rep(NA,4)), nrow=4),
-                           index_seq = 1:6),
+                           index_seq = 1:5),
                "has NAs present in every row")
 
   expect_error(lg_assembly(as.numeric(rep(NA, 4)), matrix(1:20, nrow=4),
-                           index_seq = 1:6),
+                           index_seq = 1:5),
                "Response is entirely NAs")
 
   expect_message(a1 <- lg_assembly(1:4, matrix(c(1:19,NA), nrow=4),
