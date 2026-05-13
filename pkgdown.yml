@@ -1,9 +1,9 @@
-pandoc: 3.1.11
+pandoc: 3.8.3
 pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
   laggar: laggar.html
-last_built: 2026-04-14T14:50Z
+last_built: 2026-05-13T14:24Z
 urls:
   reference: https://nerc-ceh.github.io/laggar/reference
   article: https://nerc-ceh.github.io/laggar/articles

@@ -8,11 +8,13 @@ For more information on the statistical method, see the preprint of
 Miller et al [2025](https://doi.org/10.48550/arXiv.2508.07915).
 
 ``` r
+
 # install laggar if not already installed
 # remotes::install_github("NERC-CEH/laggar")
 ```
 
 ``` r
+
 library(laggar)
 library(sf)
 #> Linking to GEOS 3.12.1, GDAL 3.8.4, PROJ 9.4.0; sf_use_s2() is TRUE
@@ -27,6 +29,7 @@ library(mgcv)
 ### Simulate data
 
 ``` r
+
 set.seed(100230)
 boundary <- st_polygon(list(matrix(c(0,1000,1000,0,0,
                                      0,0,1000,1000,0),ncol=2)))
@@ -47,6 +50,7 @@ Now simulate number of seeds by using number of trees within distance
 (ignoring boundary effects of polygon for this):
 
 ``` r
+
 vshort_distance <- sum_within_dist(seedtraps, adults, boundary, 10)
 short_distance <- sum_within_dist(seedtraps, adults, boundary, 25)
 medium_distance <- sum_within_dist(seedtraps, adults, boundary, 75)
@@ -65,10 +69,12 @@ nseeds <- rpois(100, total_pred)
 Establish sequences of distance of interest
 
 ``` r
+
 dist_seq <- seq(10,200,10)
 ```
 
 ``` r
+
 points_parea <- lg_points(seedtraps, adults, 
                           dist_seq = dist_seq, bound_poly = boundary)
 points_perha <- 1e4*points_parea$value_parea
@@ -77,6 +83,7 @@ points_perha <- 1e4*points_parea$value_parea
 Assemble into lagR object:
 
 ``` r
+
 lgr <- lg_assembly(response = nseeds, 
                    covariate = points_perha, 
                    index_seq = dist_seq)
@@ -85,6 +92,7 @@ lgr <- lg_assembly(response = nseeds,
 Graphical checks:
 
 ``` r
+
 lg_plot(lgr)
 ```
 
@@ -93,12 +101,14 @@ lg_plot(lgr)
 ### Model
 
 ``` r
+
 modfit <- gam(response ~ te(index, by = covariate, bs = "tp", k = 10),
               data = lgr,
               family = "poisson", method = "REML")
 ```
 
 ``` r
+
 summary(modfit)
 #> 
 #> Family: poisson 
@@ -122,6 +132,7 @@ summary(modfit)
 ```
 
 ``` r
+
 plot(modfit)
 ```
 
@@ -134,6 +145,7 @@ plot(modfit)
 Load in a couple of extra packages for data simulation and plotting:
 
 ``` r
+
 library(prioritizr)
 library(tidyterra)
 #> 
@@ -142,13 +154,14 @@ library(tidyterra)
 #> 
 #>     filter
 library(terra)
-#> terra 1.9.11
+#> terra 1.9.27
 ```
 
 We’ll use the sampling locations created above, for simplicity. But
 we’ll now add a raster layer over the area of interest:
 
 ``` r
+
 # background rainfall data
 r <- terra::rast(vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:32630")
 renv <- simulate_data(x = r, n = 1, scale = 0.8, intensity = 22, sd = 1)
@@ -167,6 +180,7 @@ Simulate a monotonically decreasing effect of the raster layer with
 increasing distance from the measurement point:
 
 ``` r
+
 val_distance <- values_within_dist_rast(seedtraps, renv, func = "mean",
                                         dist_seq = c(50,100,150,200),
                                         plot_doughnuts = FALSE)
@@ -186,12 +200,14 @@ growth_rate <- rnorm(100, total_pred,0.25)
 Establish sequences of distance of interest.
 
 ``` r
+
 dist_seq <- seq(20,200,20)
 ```
 
 Extract the summary values over the sequence of distances:
 
 ``` r
+
 rast_sum <- lg_rast(x = seedtraps,
                     y = renv,
                     func = "mean",
@@ -209,6 +225,7 @@ rast_sum <- lg_rast(x = seedtraps,
 Assemble into lagR object:
 
 ``` r
+
 lgr <- lg_assembly(response = growth_rate, 
                    covariate = rast_sum$value_parea, 
                    index_seq = dist_seq)
@@ -217,6 +234,7 @@ lgr <- lg_assembly(response = growth_rate,
 Graphical checks:
 
 ``` r
+
 lg_plot(lgr)
 ```
 
@@ -225,11 +243,13 @@ lg_plot(lgr)
 ### Model
 
 ``` r
+
 modfit <- gam(response ~ te(index, by = covariate, bs = "tp", k = 10),
               data = lgr, method = "REML")
 ```
 
 ``` r
+
 summary(modfit)
 #> 
 #> Family: gaussian 
@@ -255,6 +275,7 @@ summary(modfit)
 ```
 
 ``` r
+
 plot(modfit)
 ```
 
