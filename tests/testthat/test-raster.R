@@ -21,8 +21,13 @@ growth_rate <- stats::rnorm(100)
 # test run
 test_that("raster data extraction works", {
   expect_error(lg_rast(x = seedtraps, y = renv, func = 2,
-                        dist_seq = dist_seq, mindist = NULL, maxdist = NULL, incdist = NULL,
-                        plot_doughnuts = FALSE),
+                       dist_seq = dist_seq, mindist = NULL, maxdist = NULL, incdist = NULL,
+                       plot_doughnuts = FALSE),
+               "'func' must be of class 'character' or 'function'")
+
+  expect_error(lg_rast(x = seedtraps, y = renv, func = NULL,
+                       dist_seq = dist_seq, mindist = NULL, maxdist = NULL, incdist = NULL,
+                       plot_doughnuts = FALSE),
                "'func' must be of class 'character' or 'function'")
 
   expect_message(rast_sum <- lg_rast(x = seedtraps, y = renv,
