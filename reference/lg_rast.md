@@ -11,7 +11,7 @@ values or aggregated summaries.
 lg_rast(
   x,
   y,
-  func = NULL,
+  func = "mean",
   dist_seq = NULL,
   mindist = NULL,
   maxdist = NULL,
@@ -37,8 +37,7 @@ lg_rast(
 - func:
 
   Optional. A function or character string specifying how to summarize
-  raster values within each buffer. If `NULL`, raw cell values are
-  returned. Accepts functions supported by
+  raster values within each buffer. Accepts functions supported by
   [`exactextractr::exact_extract`](https://isciences.gitlab.io/exactextractr/reference/exact_extract.html)
   or a custom function that takes a numeric vector and returns a single
   value.
