@@ -7,7 +7,7 @@
 lg_rast(
   x,
   y,
-  func = NULL,
+  func = "mean",
   dist_seq = NULL,
   mindist = NULL,
   maxdist = NULL,
@@ -25,7 +25,7 @@ convertible to \code{sf} via internal helper functions.}
 to summarize.}
 
 \item{func}{Optional. A function or character string specifying how to summarize
-raster values within each buffer. If \code{NULL}, raw cell values are returned.
+raster values within each buffer.
 Accepts functions supported by \code{exactextractr::exact_extract} or a custom
 function that takes a numeric vector and returns a single value.}
 

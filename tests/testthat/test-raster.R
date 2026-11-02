@@ -12,8 +12,9 @@ seedtraps <- data.frame(
 
 dist_seq <- seq(10,200,length.out=10)
 
-r <- terra::rast(terra::vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:32630")
-renv <- prioritizr::simulate_data(x = r, n = 1, scale = 0.8, intensity = 22, sd = 1)
+renv <- terra::rast(terra::vect(boundary), nrow = 100, ncol = 100, vals = 1, crs = "EPSG:32630")
+terra::values(renv) <- runif(terra::ncell(renv))
+# renv <- prioritizr::simulate_data(x = r, n = 1, scale = 0.8, intensity = 22, sd = 1)
 
 growth_rate <- stats::rnorm(100)
 

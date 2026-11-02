@@ -43,7 +43,9 @@ test_that("lg_plot.data.frame works", {
                "not a named part")
 })
 
-test_sf <- sf::st_as_sf(dplyr::mutate(test_df, X = runif(10), Y = runif(10)),
+test_df$X <- runif(10)
+test_df$Y <- runif(10)
+test_sf <- sf::st_as_sf(test_df,
                         coords = c("X","Y"))
 test_that("lg_plot.data.frame works", {
   pl <- lg_plot(test_sf,
